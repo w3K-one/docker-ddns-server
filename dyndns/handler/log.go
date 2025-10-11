@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/benjaminbear/docker-ddns-server/dyndns/model"
+	"github.com/w3K-one/docker-ddns-server/dyndns/model"
 	"github.com/labstack/echo/v4"
 )
 
@@ -21,10 +21,6 @@ func (h *Handler) CreateLogEntry(log *model.Log) (err error) {
 
 // ShowLogs fetches all log entries from all hosts and renders them to the website.
 func (h *Handler) ShowLogs(c echo.Context) (err error) {
-	if !h.AuthAdmin {
-		return c.JSON(http.StatusUnauthorized, &Error{UNAUTHORIZED})
-	}
-
 	logs := new([]model.Log)
 	if err = h.DB.Preload("Host").Limit(30).Order("created_at desc").Find(logs).Error; err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
@@ -33,15 +29,14 @@ func (h *Handler) ShowLogs(c echo.Context) (err error) {
 	return c.Render(http.StatusOK, "listlogs", echo.Map{
 		"logs":  logs,
 		"title": h.Title,
+		"logoPath": h.LogoPath,
+		"poweredBy":    h.PoweredBy,
+		"poweredByUrl": h.PoweredByUrl,
 	})
 }
 
 // ShowHostLogs fetches all log entries of a specific host by "id" and renders them to the website.
 func (h *Handler) ShowHostLogs(c echo.Context) (err error) {
-	if !h.AuthAdmin {
-		return c.JSON(http.StatusUnauthorized, &Error{UNAUTHORIZED})
-	}
-
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
@@ -55,6 +50,9 @@ func (h *Handler) ShowHostLogs(c echo.Context) (err error) {
 	return c.Render(http.StatusOK, "listlogs", echo.Map{
 		"logs":  logs,
 		"title": h.Title,
+		"logoPath": h.LogoPath,
+		"poweredBy":    h.PoweredBy,
+		"poweredByUrl": h.PoweredByUrl,
 	})
 }
 

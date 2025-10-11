@@ -51,4 +51,12 @@
         </tbody>
     </table>
 </div>
+
+{{ if .migrationReport }}
+<div class="alert alert-info">
+    <strong>Database Migration Report:</strong>
+    <p>The following legacy entries were automatically converted to lowercase. You can copy this for your records.</p>
+    <textarea class="form-control" rows="5" readonly>{{ .migrationReport }}</textarea>
+</div>
+{{ end }}
 {{end}}

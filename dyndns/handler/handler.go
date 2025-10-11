@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benjaminbear/docker-ddns-server/dyndns/model"
+	"github.com/w3K-one/docker-ddns-server/dyndns/model"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"github.com/tg123/go-htpasswd"
@@ -28,6 +28,10 @@ type Handler struct {
 	ClearInterval    uint64
 	AllowWildcard    bool
 	LogoutUrl        string
+	LogoPath         string
+	SessionStore     *SessionStore
+	PoweredBy        string
+	PoweredByUrl     string
 }
 
 type Envs struct {
@@ -52,15 +56,16 @@ type Error struct {
 // To gather admin rights the username password combination must match with the credentials given by the env var.
 func (h *Handler) AuthenticateUpdate(username, password string, c echo.Context) (bool, error) {
 	h.CheckClearInterval()
-	reqParameter := c.QueryParam("hostname")
+	reqParameter := strings.ToLower(c.QueryParam("hostname"))
 	reqArr := strings.SplitN(reqParameter, ".", 2)
 	if len(reqArr) != 2 {
 		log.Error("Error: Something wrong with the hostname parameter")
 		return false, nil
 	}
 
+	lowerUsername := strings.ToLower(username)
 	host := &model.Host{}
-	if err := h.DB.Where(&model.Host{UserName: username, Password: password, Hostname: reqArr[0], Domain: reqArr[1]}).First(host).Error; err != nil {
+	if err := h.DB.Where(&model.Host{UserName: lowerUsername, Password: password, Hostname: reqArr[0], Domain: reqArr[1]}).First(host).Error; err != nil {
 		log.Error("Error: ", err)
 		return false, nil
 	}
@@ -119,8 +124,20 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 	var ok bool
 	h.Title, ok = os.LookupEnv("DDNS_TITLE")
 	if !ok {
-		h.Title = "TheBBCloud DynDNS"
+		h.Title = "w3K DynDNS"
 	}
+	
+	// ADDED: Check for logo files in the static icons directory upon startup.
+	logoExtensions := []string{"png", "webp", "svg"}
+	for _, ext := range logoExtensions {
+		path := fmt.Sprintf("static/icons/logo.%s", ext)
+		if _, err := os.Stat(path); err == nil {
+			h.LogoPath = "/" + path // Store the valid path if found
+			log.Info("Found logo at: ", h.LogoPath)
+			break
+		}
+	}
+	
 	allowWildcard, ok := os.LookupEnv("DDNS_ALLOW_WILDCARD")
 	if ok {
 		h.AllowWildcard, err = strconv.ParseBool(allowWildcard)
@@ -134,6 +151,20 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 			log.Info("Logout url set: ", logoutUrl)
 			h.LogoutUrl = logoutUrl
 		}
+	}
+
+	h.PoweredBy, ok = os.LookupEnv("DDNS_POWERED_BY")
+	if !ok || h.PoweredBy == "" {
+		h.PoweredBy = "w3K LLC"
+	} else {
+		log.Info("Powered by set: ", h.PoweredBy)
+	}
+
+	h.PoweredByUrl, ok = os.LookupEnv("DDNS_POWERED_BY_URL")
+	if !ok || h.PoweredByUrl == "" {
+		h.PoweredByUrl = "https://w3K.one/"
+	} else {
+		log.Info("Powered by URL set: ", h.PoweredByUrl)
 	}
 
 	clearEnv := os.Getenv("DDNS_CLEAR_LOG_INTERVAL")
@@ -153,6 +184,11 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 		return adminAuth, fmt.Errorf("environment variable DDNS_DOMAINS has to be set")
 	}
 
+	// Initialize session store
+	if err := h.InitSessionStore(); err != nil {
+		return adminAuth, fmt.Errorf("failed to initialize session store: %v", err)
+	}
+
 	return adminAuth, nil
 }
 
@@ -170,7 +206,14 @@ func (h *Handler) InitDB() (err error) {
 		return err
 	}
 
-	err = h.DB.AutoMigrate(&model.Host{}, &model.CName{}, &model.Log{})
+	// Migrate all models including new security models
+	err = h.DB.AutoMigrate(
+		&model.Host{}, 
+		&model.CName{}, 
+		&model.Log{},
+		&model.FailedAuth{},   // NEW: Failed authentication tracking
+		&model.BlockedIP{},     // NEW: Blocked IP tracking
+	)
 
 	return err
 }

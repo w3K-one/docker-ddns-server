@@ -1,8 +1,8 @@
 version: '3'
 services:
   ddns:
-    image: bbaerthlein/docker-ddns-server:latest
-    restart: always
+    image: w3kllc/ddns:latest
+    restart: unless-stopped
     environment:
       DDNS_ADMIN_LOGIN: 'admin:$$3$$abcdefg'
       DDNS_DOMAINS: 'dyndns.example.com'
