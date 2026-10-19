@@ -6,6 +6,8 @@ on:
     branches: [ "master" ]
     paths:
       - 'dyndns/**'
+      - 'deployment/**'
+      - '.github/workflows/BuildEmAll.yml'
 
   # Allow this workflow to be run manually from the Actions tab
   workflow_dispatch:

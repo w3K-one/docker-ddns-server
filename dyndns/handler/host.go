@@ -10,9 +10,9 @@ import (
 
 	l "github.com/labstack/gommon/log"
 
+	"github.com/labstack/echo/v4"
 	"github.com/w3K-one/docker-ddns-server/dyndns/model"
 	"github.com/w3K-one/docker-ddns-server/dyndns/nswrapper"
-	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
 
@@ -135,10 +135,10 @@ func (h *Handler) ListHosts(c echo.Context) (err error) {
 // AddHost just renders the "add host" website.
 func (h *Handler) AddHost(c echo.Context) (err error) {
 	return c.Render(http.StatusOK, "edithost", echo.Map{
-		"addEdit":  "add",
-		"config":   h.Config,
-		"title":    h.Title,
-		"logoPath": h.LogoPath,
+		"addEdit":      "add",
+		"config":       h.Config,
+		"title":        h.Title,
+		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,
 		"poweredByUrl": h.PoweredByUrl,
 	})
@@ -157,11 +157,11 @@ func (h *Handler) EditHost(c echo.Context) (err error) {
 	}
 
 	return c.Render(http.StatusOK, "edithost", echo.Map{
-		"host":     host,
-		"addEdit":  "edit",
-		"config":   h.Config,
-		"title":    h.Title,
-		"logoPath": h.LogoPath,
+		"host":         host,
+		"addEdit":      "edit",
+		"config":       h.Config,
+		"title":        h.Title,
+		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,
 		"poweredByUrl": h.PoweredByUrl,
 	})
@@ -268,25 +268,26 @@ func (h *Handler) DeleteHost(c echo.Context) (err error) {
 	}
 
 	err = h.DB.Transaction(func(tx *gorm.DB) error {
-		if err = tx.Unscoped().Delete(host).Error; err != nil {
-			return c.JSON(http.StatusBadRequest, &Error{err.Error()})
+		var cnames []model.CName
+		if err := tx.Where("target_id = ?", id).Find(&cnames).Error; err != nil {
+			return err
 		}
-
-		if err = tx.Where(&model.Log{HostID: uint(id)}).Delete(&model.Log{}).Error; err != nil {
-			return c.JSON(http.StatusBadRequest, &Error{err.Error()})
+		names := []string{host.Hostname}
+		for _, cname := range cnames {
+			names = append(names, cname.Hostname)
 		}
-
-		if err = tx.Where(&model.CName{TargetID: uint(id)}).Delete(&model.CName{}).Error; err != nil {
-			return c.JSON(http.StatusBadRequest, &Error{err.Error()})
+		if err := tx.Unscoped().Delete(host).Error; err != nil {
+			return err
 		}
-
-		return nil
+		if err := tx.Where("host_id = ?", id).Delete(&model.Log{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("target_id = ?", id).Delete(&model.CName{}).Error; err != nil {
+			return err
+		}
+		return h.removeDNSRecords(names, host.Domain)
 	})
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
-	}
-
-	if err = nswrapper.DeleteRecord(host.Hostname, host.Domain, h.AllowWildcard); err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
@@ -306,7 +307,7 @@ func (h *Handler) UpdateIP(c echo.Context) (err error) {
 	log.SentIP = c.QueryParam(("myip"))
 
 	// Get caller IP
-	log.CallerIP, _ = nswrapper.GetCallerIP(c.Request())
+	log.CallerIP, _ = nswrapper.GetCallerIP(c.Request(), h.TrustedProxies)
 	if log.CallerIP == "" {
 		log.CallerIP, _, err = net.SplitHostPort(c.Request().RemoteAddr)
 		if err != nil {

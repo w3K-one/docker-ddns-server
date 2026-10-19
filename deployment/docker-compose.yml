@@ -2,9 +2,14 @@ version: '3'
 services:
   ddns:
     image: w3kllc/ddns:latest
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
     restart: unless-stopped
     environment:
       DDNS_ADMIN_LOGIN: 'admin:$$3$$abcdefg'
+      DDNS_SESSION_SECRET: ${DDNS_SESSION_SECRET:?Set a random secret of at least 32 bytes}
+      DDNS_TRUSTED_PROXIES: ${DDNS_TRUSTED_PROXIES:-}
       DDNS_DOMAINS: 'dyndns.example.com'
       DDNS_PARENT_NS: 'ns.example.com'
       DDNS_DEFAULT_TTL: '3600'

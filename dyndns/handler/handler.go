@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
+	"github.com/w3K-one/docker-ddns-server/dyndns/nswrapper"
+	"gorm.io/gorm/logger"
 
 	"github.com/labstack/gommon/log"
 
@@ -10,16 +13,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/w3K-one/docker-ddns-server/dyndns/model"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"github.com/tg123/go-htpasswd"
+	"github.com/w3K-one/docker-ddns-server/dyndns/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 type Handler struct {
 	DB               *gorm.DB
+	TrustedProxies   nswrapper.TrustedProxies
+	deleteRecords    func([]string, string, bool) error
 	AuthAdmin        bool
 	Config           Envs
 	Title            string
@@ -56,18 +61,23 @@ type Error struct {
 // To gather admin rights the username password combination must match with the credentials given by the env var.
 func (h *Handler) AuthenticateUpdate(username, password string, c echo.Context) (bool, error) {
 	h.CheckClearInterval()
+	if username == "" || password == "" {
+		return false, nil
+	}
 	reqParameter := strings.ToLower(c.QueryParam("hostname"))
 	reqArr := strings.SplitN(reqParameter, ".", 2)
-	if len(reqArr) != 2 {
+	if len(reqArr) != 2 || reqArr[0] == "" || reqArr[1] == "" {
 		log.Error("Error: Something wrong with the hostname parameter")
 		return false, nil
 	}
 
 	lowerUsername := strings.ToLower(username)
 	host := &model.Host{}
-	if err := h.DB.Where(&model.Host{UserName: lowerUsername, Password: password, Hostname: reqArr[0], Domain: reqArr[1]}).First(host).Error; err != nil {
-		log.Error("Error: ", err)
-		return false, nil
+	if err := h.DB.Where("user_name = ? AND password = ? AND hostname = ? AND domain = ?", lowerUsername, password, reqArr[0], reqArr[1]).First(host).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
 	}
 	if host.ID == 0 {
 		log.Error("hostname or user user credentials unknown")
@@ -126,7 +136,7 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 	if !ok {
 		h.Title = "w3K DynDNS"
 	}
-	
+
 	// ADDED: Check for logo files in the static icons directory upon startup.
 	logoExtensions := []string{"png", "webp", "svg"}
 	for _, ext := range logoExtensions {
@@ -137,7 +147,7 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 			break
 		}
 	}
-	
+
 	allowWildcard, ok := os.LookupEnv("DDNS_ALLOW_WILDCARD")
 	if ok {
 		h.AllowWildcard, err = strconv.ParseBool(allowWildcard)
@@ -184,6 +194,11 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 		return adminAuth, fmt.Errorf("environment variable DDNS_DOMAINS has to be set")
 	}
 
+	h.TrustedProxies, err = nswrapper.ParseTrustedProxies(os.Getenv("DDNS_TRUSTED_PROXIES"))
+	if err != nil {
+		return adminAuth, err
+	}
+
 	// Initialize session store
 	if err := h.InitSessionStore(); err != nil {
 		return adminAuth, fmt.Errorf("failed to initialize session store: %v", err)
@@ -201,19 +216,12 @@ func (h *Handler) InitDB() (err error) {
 		}
 	}
 
-	h.DB, err = gorm.Open(sqlite.Open("database/ddns.db"), &gorm.Config{})
+	h.DB, err = gorm.Open(sqlite.Open("database/ddns.db"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return err
 	}
 
-	// Migrate all models including new security models
-	err = h.DB.AutoMigrate(
-		&model.Host{}, 
-		&model.CName{}, 
-		&model.Log{},
-		&model.FailedAuth{},   // NEW: Failed authentication tracking
-		&model.BlockedIP{},     // NEW: Blocked IP tracking
-	)
+	err = migrateDatabase(h.DB)
 
 	return err
 }

@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/labstack/echo/v4"
 	"github.com/w3K-one/docker-ddns-server/dyndns/model"
 	"github.com/w3K-one/docker-ddns-server/dyndns/nswrapper"
-	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
 
@@ -20,9 +20,9 @@ func (h *Handler) ListCNames(c echo.Context) (err error) {
 	}
 
 	return c.Render(http.StatusOK, "listcnames", echo.Map{
-		"cnames": cnames,
-		"title":  h.Title,
-		"logoPath": h.LogoPath,
+		"cnames":       cnames,
+		"title":        h.Title,
+		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,
 		"poweredByUrl": h.PoweredByUrl,
 	})
@@ -37,10 +37,10 @@ func (h *Handler) AddCName(c echo.Context) (err error) {
 	}
 
 	return c.Render(http.StatusOK, "addcname", echo.Map{
-		"config": h.Config,
-		"hosts":  hosts,
-		"title":  h.Title,
-		"logoPath": h.LogoPath,
+		"config":       h.Config,
+		"hosts":        hosts,
+		"title":        h.Title,
+		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,
 		"poweredByUrl": h.PoweredByUrl,
 	})
@@ -55,12 +55,17 @@ func (h *Handler) CreateCName(c echo.Context) (err error) {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
+	targetID, parseErr := strconv.ParseUint(c.FormValue("target_id"), 10, 64)
+	if parseErr != nil || targetID == 0 {
+		return c.JSON(http.StatusBadRequest, &Error{"invalid target_id"})
+	}
 	host := &model.Host{}
-	if err = h.DB.First(host, c.FormValue("target_id")).Error; err != nil {
+	if err = h.DB.Where("id = ?", targetID).First(host).Error; err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
 	cname.Target = *host
+	cname.TargetID = host.ID
 
 	if err = c.Validate(cname); err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
@@ -95,19 +100,13 @@ func (h *Handler) DeleteCName(c echo.Context) (err error) {
 	}
 
 	err = h.DB.Transaction(func(tx *gorm.DB) error {
-		if err = tx.Unscoped().Delete(cname).Error; err != nil {
-			return c.JSON(http.StatusBadRequest, &Error{err.Error()})
+		if err := tx.Unscoped().Delete(cname).Error; err != nil {
+			return err
 		}
-
-		return nil
+		return h.removeDNSRecords([]string{cname.Hostname}, cname.Target.Domain)
 	})
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
-
-	if err = nswrapper.DeleteRecord(cname.Hostname, cname.Target.Domain, h.AllowWildcard); err != nil {
-		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
-	}
-
 	return c.JSON(http.StatusOK, id)
 }

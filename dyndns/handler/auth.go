@@ -28,13 +28,13 @@ func (h *Handler) ShowLoginPage(c echo.Context) error {
 
 	// Check if there's an error message from failed login
 	errorMsg := c.QueryParam("error")
-	
+
 	return c.Render(http.StatusOK, "login", echo.Map{
-		"title":    h.Title,
-		"logoPath": h.LogoPath,
+		"title":        h.Title,
+		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,
 		"poweredByUrl": h.PoweredByUrl,
-		"error":    errorMsg,
+		"error":        errorMsg,
 	})
 }
 
@@ -45,11 +45,7 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 	rememberMe := c.FormValue("remember_me") == "on"
 
 	// Get client IP for logging
-	clientIP := ExtractIPFromRequest(
-		c.Request().RemoteAddr,
-		c.Request().Header.Get("X-Forwarded-For"),
-		c.Request().Header.Get("X-Real-IP"),
-	)
+	clientIP := h.TrustedProxies.ClientIP(c.Request())
 
 	// Validate credentials
 	authenticated, err := h.authByEnv(username, password)
@@ -141,9 +137,9 @@ func (h *Handler) HandleLogout(c echo.Context) error {
 	// ALWAYS render logout page (not redirect)
 	// Pass LogoutUrl so JavaScript can handle delayed redirect
 	return c.Render(http.StatusOK, "logout", echo.Map{
-		"title":     h.Title,
-		"logoPath":  h.LogoPath,
-		"logoutUrl": h.LogoutUrl, // Pass the logout URL to template
+		"title":        h.Title,
+		"logoPath":     h.LogoPath,
+		"logoutUrl":    h.LogoutUrl, // Pass the logout URL to template
 		"poweredBy":    h.PoweredBy,
 		"poweredByUrl": h.PoweredByUrl,
 	})
@@ -197,6 +193,10 @@ func (h *Handler) IsHTTPS(c echo.Context) bool {
 	// Check if direct HTTPS
 	if c.Request().TLS != nil {
 		return true
+	}
+
+	if !h.TrustedProxies.TrustsRemote(c.Request().RemoteAddr) {
+		return false
 	}
 
 	// Check reverse proxy headers

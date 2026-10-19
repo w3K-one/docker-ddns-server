@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // UpdateRecord builds a nsupdate file and updates a record by executing it with nsupdate.
@@ -48,48 +49,51 @@ func UpdateRecord(hostname string, target string, addrType string, zone string, 
 	}
 
 	if out.String() != "" {
-		return fmt.Errorf(out.String())
+		return fmt.Errorf("%s", out.String())
 	}
 
 	return nil
 }
 
-// DeleteRecord builds a nsupdate file and deletes a record by executing it with nsupdate.
+// DeleteRecord deletes a name and optionally its wildcard.
 func DeleteRecord(hostname string, zone string, enableWildcard bool) error {
-	fmt.Printf("record delete request: %s\n", hostname)
+	return DeleteRecords([]string{hostname}, zone, enableWildcard)
+}
 
-	f, err := ioutil.TempFile(os.TempDir(), "dyndns")
+// DeleteRecords removes related names in one atomic, single-zone DNS update.
+func DeleteRecords(names []string, zone string, enableWildcard bool) error {
+	script, err := deleteScript(names, zone, enableWildcard)
 	if err != nil {
 		return err
 	}
-
-	defer os.Remove(f.Name())
-	w := bufio.NewWriter(f)
-
-	w.WriteString(fmt.Sprintf("server %s\n", "localhost"))
-	w.WriteString(fmt.Sprintf("zone %s\n", zone))
-	w.WriteString(fmt.Sprintf("update delete %s.%s\n", hostname, zone))
-	if enableWildcard {
-		w.WriteString(fmt.Sprintf("update delete %s.%s\n", "*."+hostname, zone))
-	}
-	w.WriteString("send\n")
-
-	w.Flush()
-	f.Close()
-
-	cmd := exec.Command("/usr/bin/nsupdate", f.Name())
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	cmd := exec.Command("/usr/bin/nsupdate")
+	cmd.Stdin = strings.NewReader(script)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%v: %v", err, stderr.String())
+		return fmt.Errorf("nsupdate: %w: %s", err, output)
 	}
-
-	if out.String() != "" {
-		return fmt.Errorf(out.String())
+	if len(output) != 0 {
+		return fmt.Errorf("nsupdate: %s", output)
 	}
-
 	return nil
+}
+
+func deleteScript(names []string, zone string, wildcard bool) (string, error) {
+	valid := func(s string) bool { return s != "" && !strings.ContainsAny(s, " \t\r\n;\\\"") }
+	if !valid(zone) {
+		return "", fmt.Errorf("invalid zone")
+	}
+	var script strings.Builder
+	fmt.Fprintf(&script, "server localhost\nzone %s\n", zone)
+	for _, name := range names {
+		if !valid(name) {
+			return "", fmt.Errorf("invalid name")
+		}
+		fmt.Fprintf(&script, "update delete %s.%s\n", name, zone)
+		if wildcard {
+			fmt.Fprintf(&script, "update delete *.%s.%s\n", name, zone)
+		}
+	}
+	script.WriteString("send\n")
+	return script.String(), nil
 }
