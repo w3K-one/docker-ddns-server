@@ -36,7 +36,7 @@
     }
 </style>
 <div class="marketing">
-    <div class="hosts-toolbar"><h3>DNS Host Entries</h3><div class="hosts-toolbar-actions"><label class="sr-only" for="host-domain-filter">Filter by domain</label><select id="host-domain-filter" class="custom-select custom-select-sm host-domain-filter"><option value="">All domains</option>{{range .domains}}<option value="{{.}}">{{.}}</option>{{end}}</select><button type="button" class="host-sort-reset btn btn-outline-secondary host-icon" title="Restore original entry order" aria-label="Restore original entry order" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/></svg></button><button class="addHost btn btn-primary btn-sm">Add Host Entry</button></div></div>
+    <div class="hosts-toolbar"><h3>DNS Host Entries</h3><div class="hosts-toolbar-actions"><label class="sr-only" for="host-domain-filter">Filter by zone</label><select id="host-domain-filter" class="custom-select custom-select-sm host-domain-filter"><option value="">All zones</option>{{range .domains}}<option value="{{.}}">{{.}}</option>{{end}}</select><button type="button" class="host-sort-reset btn btn-outline-secondary host-icon" title="Restore original entry order" aria-label="Restore original entry order" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/></svg></button><button class="addHost btn btn-primary btn-sm">Add Host Entry</button></div></div>
     <table class="table table-striped text-center hosts-table">
         <thead>
         <tr>
@@ -85,7 +85,7 @@
         {{end}}
         </tbody>
     </table>
-    <p class="host-filter-empty text-muted" role="status" hidden>No hosts in this domain.</p>
+    <p class="host-filter-empty text-muted" role="status" hidden>No hosts in this zone.</p>
     <script src="/static/js/hosts-sort.js"></script>
 </div>
 
