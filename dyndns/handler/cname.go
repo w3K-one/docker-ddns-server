@@ -16,12 +16,13 @@ import (
 func (h *Handler) ListCNames(c echo.Context) (err error) {
 	// Auth check removed - middleware handles this
 	cnames := new([]model.CName)
-	if err = h.DB.Preload("Target").Find(cnames).Error; err != nil {
+	if err = h.DB.Preload("Target").Order("id ASC").Find(cnames).Error; err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
 	return c.Render(http.StatusOK, "listcnames", echo.Map{
 		"cnames":       cnames,
+		"domains":      h.Config.Domains,
 		"title":        h.Title,
 		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,

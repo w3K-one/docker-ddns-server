@@ -1,20 +1,20 @@
 (() => {
-    const table = document.querySelector('.hosts-table');
+    const table = document.querySelector('.entries-table');
     if (!table) return;
     const body = table.tBodies[0];
     const originalRows = Array.from(body.rows);
-    const reset = document.querySelector('.host-sort-reset');
+    const reset = document.querySelector('.entry-sort-reset');
     reset.addEventListener('click', () => {
         originalRows.filter(row => row.parentNode === body).forEach(row => body.appendChild(row));
         table.querySelectorAll('th[aria-sort]').forEach(th => th.setAttribute('aria-sort', 'none'));
         reset.disabled = true;
     });
-    const domainFilter = document.querySelector('.host-domain-filter');
-    const empty = document.querySelector('.host-filter-empty');
-    domainFilter.addEventListener('change', () => {
+    const zoneFilter = document.querySelector('.entry-zone-filter');
+    const empty = document.querySelector('.entry-filter-empty');
+    zoneFilter.addEventListener('change', () => {
         let visible = 0;
         Array.from(body.rows).forEach(row => {
-            row.hidden = Boolean(domainFilter.value && row.dataset.domain !== domainFilter.value);
+            row.hidden = Boolean(zoneFilter.value && row.dataset.zone !== zoneFilter.value);
             if (!row.hidden) visible++;
         });
         empty.hidden = visible !== 0;
@@ -43,7 +43,7 @@
         return '6:' + groups.map(n => n.padStart(4, '0')).join('');
     }
 
-    table.querySelectorAll('.host-sort').forEach(button => {
+    table.querySelectorAll('.entry-sort').forEach(button => {
         button.addEventListener('click', () => {
             const header = button.closest('th');
             const ascending = header.getAttribute('aria-sort') !== 'ascending';

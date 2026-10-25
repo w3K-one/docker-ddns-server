@@ -39,7 +39,7 @@ func (h *Handler) GetHost(c echo.Context) (err error) {
 // ListHosts fetches all hosts from database, performs an on-the-fly migration to lowercase, and lists them on the website.
 func (h *Handler) ListHosts(c echo.Context) (err error) {
 	var hosts []model.Host
-	if err = h.DB.Find(&hosts).Error; err != nil {
+	if err = h.DB.Order("id ASC").Find(&hosts).Error; err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
@@ -112,7 +112,7 @@ func (h *Handler) ListHosts(c echo.Context) (err error) {
 
 	// If a migration happened, re-query to show the final, updated list
 	if needsMigration {
-		if err = h.DB.Find(&hosts).Error; err != nil {
+		if err = h.DB.Order("id ASC").Find(&hosts).Error; err != nil {
 			return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 		}
 	}

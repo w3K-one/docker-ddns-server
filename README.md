@@ -20,7 +20,7 @@ With docker-ddns-server you can set up your own dynamic DNS server. This project
 
 ## ✨ Key Features
 
-- **Web-Based Management** - Compact icon navigation, left-aligned hostnames, sortable Hostname/IP/TTL/LastUpdate columns with an original-order reset and an All zones/per-zone filter, responsive host rows and certificate actions with accessible labels and tooltips
+- **Web-Based Management** - Compact icon navigation, left-aligned hostnames, sortable Hostname/IP/TTL/LastUpdate columns with an original-order reset and an All zones/per-zone filter, CNAME sorting by Hostname/Target/TTL with the same zone filter and reset, responsive rows and certificate actions with accessible labels and tooltips
 - **DNS Records** - A, AAAA, CNAME, TXT, MX, SRV, CAA and delegated NS RRsets
 - **Dual-Stack DDNS** - Independent IPv4 and IPv6 client updates
 - **Let’s Encrypt Certificates** - Automatic zone wildcard issuance and renewal, dedicated host certificates, and ZIP/PEM downloads

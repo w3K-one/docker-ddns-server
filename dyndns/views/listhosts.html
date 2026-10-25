@@ -1,61 +1,26 @@
 {{define "content"}}
-<style>
-    .hosts-toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .hosts-toolbar h3 { margin:0; }
-    .hosts-toolbar-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
-    .host-domain-filter { width:auto; max-width:100%; }
-    .hosts-table tr[hidden] { display:none; }
-    .hosts-table { width:100%; table-layout:fixed; }
-    .hosts-table th, .hosts-table td { padding:.65rem .4rem; vertical-align:middle; overflow-wrap:anywhere; }
-    .host-sort { color:inherit; font:inherit; font-weight:inherit; border:0; background:none; padding:0; cursor:pointer; text-align:inherit; }
-    .host-sort::after { content:' ↕'; font-size:.75em; color:#6c757d; }
-    [aria-sort="ascending"] .host-sort::after { content:' ↑'; }
-    [aria-sort="descending"] .host-sort::after { content:' ↓'; }
-    .host-sort:focus-visible { outline:2px solid #0056b3; outline-offset:3px; }
-    .hosts-table .host-name { text-align:left; width:26%; }
-    .hosts-table .host-ip { width:21%; }
-    .hosts-table .host-ttl { width:8%; }
-    .hosts-table .host-updated { width:19%; }
-    .hosts-table .host-cert { width:7%; }
-    .hosts-table .host-actions { width:19%; }
-    .host-icon { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; }
-    .host-icon svg { width:16px; height:16px; }
-    .host-action-buttons { display:flex; flex-wrap:wrap; justify-content:center; gap:4px; }
-    @media (max-width:575.98px) {
-        .hosts-toolbar { align-items:flex-start; }
-        .hosts-toolbar h3 { font-size:1.3rem; }
-        .hosts-table thead { display:block; }
-        .hosts-table thead tr { display:flex; flex-wrap:wrap; border:0; padding:0; gap:.5rem; }
-        .hosts-table th { width:auto !important; border:0; }
-        .hosts-table th:not([aria-sort]) { display:none; }
-        .hosts-table, .hosts-table tbody, .hosts-table tr { display:block; width:100%; }
-        .hosts-table tr { border:1px solid #dee2e6; margin-bottom:1rem; padding:.5rem; }
-        .hosts-table td { display:grid; grid-template-columns:5.5rem minmax(0,1fr); gap:.5rem; width:100% !important; border:0; text-align:left; }
-        .hosts-table td::before { content:attr(data-label); font-weight:600; }
-        .host-action-buttons { justify-content:flex-start; }
-    }
-</style>
+<link rel="stylesheet" href="/static/css/entry-list.css">
 <div class="marketing">
-    <div class="hosts-toolbar"><h3>DNS Host Entries</h3><div class="hosts-toolbar-actions"><label class="sr-only" for="host-domain-filter">Filter by zone</label><select id="host-domain-filter" class="custom-select custom-select-sm host-domain-filter"><option value="">All zones</option>{{range .domains}}<option value="{{.}}">{{.}}</option>{{end}}</select><button type="button" class="host-sort-reset btn btn-outline-secondary host-icon" title="Restore original entry order" aria-label="Restore original entry order" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/></svg></button><button class="addHost btn btn-primary btn-sm">Add Host Entry</button></div></div>
-    <table class="table table-striped text-center hosts-table">
+    <div class="entries-toolbar"><h3>DNS Host Entries</h3><div class="entries-toolbar-actions"><label class="sr-only" for="entry-zone-filter">Filter by zone</label><select id="entry-zone-filter" class="custom-select custom-select-sm entry-zone-filter"><option value="">All zones</option>{{range .domains}}<option value="{{.}}">{{.}}</option>{{end}}</select><button type="button" class="entry-sort-reset btn btn-outline-secondary entry-icon" title="Restore original entry order" aria-label="Restore original entry order" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/></svg></button><button class="addHost btn btn-primary btn-sm">Add Host Entry</button></div></div>
+    <table class="table table-striped text-center entries-table">
         <thead>
         <tr>
-            <th scope="col" class="host-name" aria-sort="none"><button type="button" class="host-sort" data-sort="hostname">Hostname</button></th>
-            <th scope="col" class="host-ip" aria-sort="none"><button type="button" class="host-sort" data-sort="ip">IP</button></th>
-            <th scope="col" class="host-ttl" aria-sort="none"><button type="button" class="host-sort" data-sort="ttl">TTL</button></th>
-            <th scope="col" class="host-updated" aria-sort="none"><button type="button" class="host-sort" data-sort="updated">LastUpdate</button></th>
-            <th scope="col" class="host-cert">Cert</th>
-            <th scope="col" class="host-actions"><span class="sr-only">Actions</span></th>
+            <th scope="col" class="entry-name" aria-sort="none"><button type="button" class="entry-sort" data-sort="hostname">Hostname</button></th>
+            <th scope="col" class="entry-ip" aria-sort="none"><button type="button" class="entry-sort" data-sort="ip">IP</button></th>
+            <th scope="col" class="entry-ttl" aria-sort="none"><button type="button" class="entry-sort" data-sort="ttl">TTL</button></th>
+            <th scope="col" class="entry-updated" aria-sort="none"><button type="button" class="entry-sort" data-sort="updated">LastUpdate</button></th>
+            <th scope="col" class="entry-cert">Cert</th>
+            <th scope="col" class="entry-actions"><span class="sr-only">Actions</span></th>
         </tr>
         </thead>
         <tbody>
         {{range .hosts}}
-        <tr id="host_{{.ID}}" data-domain="{{.Domain}}">
-            <td data-label="Hostname" class="host-name" id="host-hostname_{{.ID}}">{{.Hostname}}.{{.Domain}}</td>
+        <tr id="host_{{.ID}}" data-zone="{{.Domain}}">
+            <td data-label="Hostname" class="entry-name" id="host-hostname_{{.ID}}">{{.Hostname}}.{{.Domain}}</td>
             <td data-label="IP" data-sort-value="{{.Ip}}">{{.Ip}}</td>
             <td data-label="TTL" data-sort-value="{{.Ttl}}">{{.Ttl}}</td>
             <td data-label="LastUpdate" data-sort-value="{{.LastUpdate.Unix}}">{{if .LastUpdate.IsZero}}Never{{else}}{{.LastUpdate.Format "01/02/2006 15:04 MEZ"}}{{end}}</td>
-            <td data-label="Cert">{{if index $.hostCertificates .ID}}<a class="btn btn-outline-primary btn-sm host-icon" href="/@/hosts/{{.ID}}/certificate.zip" title="Download certificate, chain and key" aria-label="Download certificate package for {{.Hostname}}.{{.Domain}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></a>{{else}}<a class="btn btn-outline-secondary btn-sm host-icon" href="/@/certs?domains={{.Hostname}}.{{.Domain}}" title="Issue certificate" aria-label="Issue certificate for {{.Hostname}}.{{.Domain}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6zM12 8v8m-4-4h8"/></svg></a>{{end}}</td>
+            <td data-label="Cert">{{if index $.hostCertificates .ID}}<a class="btn btn-outline-primary btn-sm entry-icon" href="/@/hosts/{{.ID}}/certificate.zip" title="Download certificate, chain and key" aria-label="Download certificate package for {{.Hostname}}.{{.Domain}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></a>{{else}}<a class="btn btn-outline-secondary btn-sm entry-icon" href="/@/certs?domains={{.Hostname}}.{{.Domain}}" title="Issue certificate" aria-label="Issue certificate for {{.Hostname}}.{{.Domain}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6zM12 8v8m-4-4h8"/></svg></a>{{end}}</td>
             <td data-label="Actions">
                 <div style="display:none">
                     <span id="host-domain_{{.ID}}">{{.Domain}}</span>
@@ -67,17 +32,17 @@
                     </div>
                 </div>
 
-                <div class="host-action-buttons" >
-                    <button id="{{.ID}}" title="Edit host" aria-label="Edit host" class="editHost btn btn-outline-secondary btn-sm host-icon"><img
+                <div class="entry-action-buttons" >
+                    <button id="{{.ID}}" title="Edit host" aria-label="Edit host" class="editHost btn btn-outline-secondary btn-sm entry-icon"><img
                             src="/static/icons/pencil.svg" alt="" width="16" height="16" title="Edit"></button>
                     <button
-                            id="{{.ID}}" title="Delete host" aria-label="Delete host" class="deleteHost btn btn-outline-secondary btn-sm host-icon"><img
+                            id="{{.ID}}" title="Delete host" aria-label="Delete host" class="deleteHost btn btn-outline-secondary btn-sm entry-icon"><img
                             src="/static/icons/trash.svg"
                             alt="" width="16" height="16"
                             title="Delete"></button>
-                    <button id="{{.ID}}" title="View update logs" aria-label="View update logs" class="showHostLog btn btn-outline-secondary btn-sm host-icon"><img
+                    <button id="{{.ID}}" title="View update logs" aria-label="View update logs" class="showHostLog btn btn-outline-secondary btn-sm entry-icon"><img
                             src="/static/icons/table.svg" alt="" width="16" height="16" title="Logs"></button>
-                    <button id="{{.ID}}" title="Copy update URL" aria-label="Copy update URL" class="copyUrlToClipboard btn btn-outline-secondary btn-sm host-icon"><img
+                    <button id="{{.ID}}" title="Copy update URL" aria-label="Copy update URL" class="copyUrlToClipboard btn btn-outline-secondary btn-sm entry-icon"><img
                             src="/static/icons/clipboard.svg" alt="" width="16" height="16" title="Copy URL to clipboard"></button>
                 </div>
             </td>
@@ -85,8 +50,8 @@
         {{end}}
         </tbody>
     </table>
-    <p class="host-filter-empty text-muted" role="status" hidden>No hosts in this zone.</p>
-    <script src="/static/js/hosts-sort.js"></script>
+    <p class="entry-filter-empty text-muted" role="status" hidden>No hosts in this zone.</p>
+    <script src="/static/js/entry-list.js"></script>
 </div>
 
 {{ if .migrationReport }}
