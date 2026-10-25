@@ -20,7 +20,10 @@ With docker-ddns-server you can set up your own dynamic DNS server. This project
 
 ## ✨ Key Features
 
-- **Web-Based Management** - Easy-to-use web interface for managing DNS entries
+- **Web-Based Management** - Compact icon navigation with accessible labels and tooltips
+- **DNS Records** - A, AAAA, CNAME, TXT, MX, SRV, CAA and delegated NS RRsets
+- **Dual-Stack DDNS** - Independent IPv4 and IPv6 client updates
+- **Let’s Encrypt Certificates** - Automatic zone wildcard issuance and renewal, dedicated host certificates, and ZIP/PEM downloads
 - **Security & IP Blocking** - Automatic protection against brute-force attacks
 - **Modern Authentication** - Session-based admin login with HTTPS support
 - **Security Dashboard** - Real-time monitoring of threats and blocked IPs
@@ -28,6 +31,100 @@ With docker-ddns-server you can set up your own dynamic DNS server. This project
 - **Automatic Migration** - Handles legacy data with automatic normalization
 - **Reverse Proxy Ready** - Works seamlessly with nginx, Caddy, Traefik
 - **Threat Intelligence** - Comprehensive logging for attack pattern analysis
+
+---
+
+## DNS records and certificates (v2.1.0)
+
+The **DNS records** icon opens static RRset management for A, AAAA, CNAME, TXT, MX,
+SRV, CAA and delegated NS records. Select a managed zone, use `@` for its root,
+and enter one value per line. Saving replaces that name/type's complete RRset;
+other record types are preserved. TXT is entered without surrounding quotes;
+long strings are split into DNS character strings automatically. MX uses
+`10 mail.example.net`, SRV uses `10 5 443 service.example.net` at `_service._tcp`,
+and CAA uses `0 issue letsencrypt.org`. NS records are for subzone delegation;
+apex NS and SOA remain owned by BIND setup. In-zone MX/NS targets need valid
+address/glue records before BIND accepts the delegation or mail routing.
+
+Existing DDNS addresses and host-linked CNAMEs remain on their original pages.
+Static records cannot overwrite their address/alias RRsets. Hosts can have TXT,
+MX and other non-conflicting records; deleting a host preserves those records.
+All four legacy update endpoints still accept IPv4 for A and IPv6 for AAAA.
+A dual-stack client sends one request per address family; neither erases the other.
+
+### Automatic zone certificates, dedicated host certificates
+
+Open **Certificates → Automatic certificates**, enter a contact email, choose
+RSA-2048 or EC P-256, accept the CA subscriber agreement and enable the policy.
+The app maintains **one certificate containing the apex and wildcard per managed
+zone**. A one-minute scheduler issues missing zone certificates serially and
+renews opted-in certificates within 30 days of expiry (or after two-thirds of
+their lifetime for short-lived certificates). Failed attempts back off
+from one hour to 24 hours. Removing a managed zone stops its automatic renewals.
+Disabling automatic issuance leaves existing certificates' renewal settings intact.
+Certificate automation starts disabled until that one-time setup is completed.
+
+For client infrastructure, use **Issue** on the host row or **New certificate**
+with that single hostname. Automatic renewal is selected by default. The host row
+then offers **ZIP**, containing `cert.pem`, `chain.pem`, `fullchain.pem` and
+`privkey.pem`. **Host ZIP links never fall back to zone wildcards or multi-name
+certificates**, and never select staging certificates. Wildcard ZIPs remain
+available only from the admin Certificates page for the operator's own use.
+All certificate endpoints require an authenticated admin session.
+
+The Certificates page also provides individual PEM downloads, manual renewal /
+reissue (with a fresh private key), revocation and an activity history. Failed
+renewals preserve the previous certificate/key until replacement succeeds.
+Downloads require HTTPS, are marked `no-store`, and are audited. Devices still
+need their renewed certificate/key installed separately; this release does not
+push certificates to gateways or add a public certificate download API.
+
+DNS-01 uses exact-value TXT updates, preserving unrelated TXT and concurrent
+apex/wildcard challenge values. Interrupted challenges are journaled for cleanup.
+Names must be within `DDNS_DOMAINS`; public delegation must reach this BIND server,
+and any CAA policy must permit Let's Encrypt. Authoritative NS checks normally
+use public DNS; an explicit authoritative endpoint can be configured below.
+
+### Optional configuration and key backups
+
+No new required environment variable is introduced. Certificate and account keys
+are encrypted with AES-256-GCM. On first use of this release, a separate random
+key is persisted as `/root/database/cert.key` with mode 0600, alongside the SQLite
+DB on the existing volume. **Back up the whole database volume, including
+`cert.key`**. Losing that file makes stored private keys unrecoverable. Restoring
+an existing certificate database without its key disables certificate features
+rather than silently creating a replacement key. DNS continues operating if
+certificate setup fails.
+
+| Variable | Purpose |
+|---|---|
+| `DDNS_ACME_EMAIL` | Prefills the certificate contact email |
+| `DDNS_CERT_KEY` | Optional 64-character hexadecimal encryption key instead of the persisted key file; keep stable and back it up |
+| `DDNS_ACME_DIRECTORY` | Optional fixed ACME directory override, primarily for isolated Pebble tests; overrides the staging checkbox |
+| `DDNS_ACME_AUTHORITATIVE_NS` | Optional authoritative DNS server, with optional port, for direct TXT propagation checks |
+| `DDNS_ACME_RESOLVERS` | Optional comma-separated recursive resolver endpoints for ACME DNS lookup |
+| `DDNS_TRUSTED_PROXIES` | Exact reverse-proxy IPs/CIDRs permitted to report HTTPS/client-IP headers; necessary for HTTPS downloads behind a proxy |
+| `DDNS_ALLOW_INSECURE_DOWNLOAD` | `true` only in isolated LAN tests; default false |
+
+Do not change `DDNS_CERT_KEY` or the persisted key file without re-encrypting the
+stored keys. The session-cookie secret is separate and does not encrypt certificates.
+For production updates use Chimera; preserve the existing database and BIND volumes.
+Do not remove the existing acme.sh jobs until their clients have migrated.
+
+### Verification
+
+```sh
+cd dyndns && go test -race ./... && go vet ./...
+cd ..
+docker build -f deployment/Dockerfile -t ddns-features-test:local .
+python3 tests/m0_smoke.py ddns-features-test:local
+python3 tests/features_smoke.py ddns-features-test:local
+```
+
+The feature smoke test creates disposable BIND and Pebble containers, uses fixture
+credentials, and verifies actual DNS-01 issuance, EC/RSA wildcard+apex certificates,
+renewal/key rotation, revocation and downloads. It never contacts Let's Encrypt
+production. `--keep` leaves a local preview running until Enter is pressed.
 
 ---
 
@@ -39,6 +136,12 @@ You can either use the pre-built Docker image or build it yourself.
 
 Docker Hub: https://hub.docker.com/r/w3kllc/ddns
 
+Generate a persistent secret first and store it securely for future deployments:
+
+```bash
+export DDNS_SESSION_SECRET="$(openssl rand -base64 32)"
+```
+
 **Quick Start:**
 ```bash
 docker run -it -d \
@@ -47,11 +150,11 @@ docker run -it -d \
     -p 53:53/udp \
     -v /somefolder:/var/cache/bind \
     -v /someotherfolder:/root/database \
-    -e DDNS_ADMIN_LOGIN=admin:$$2y$$05$$... \
+    -e 'DDNS_ADMIN_LOGIN=admin:$2y$05$...' \
     -e DDNS_DOMAINS=dyndns.example.com \
     -e DDNS_PARENT_NS=ns.example.com \
     -e DDNS_DEFAULT_TTL=3600 \
-    -e DDNS_SESSION_SECRET=your-random-32-char-secret \
+    -e DDNS_SESSION_SECRET="$DDNS_SESSION_SECRET" \
     --name=dyndns \
     w3kllc/ddns:latest
 ```
@@ -83,8 +186,8 @@ services:
       - DDNS_PARENT_NS=ns.example.com
       - DDNS_DEFAULT_TTL=3600
       
-      # Security (Recommended)
-      - DDNS_SESSION_SECRET=your-random-32-character-secret-key
+      # Required session signing secret
+      - DDNS_SESSION_SECRET=${DDNS_SESSION_SECRET:?Set a persistent secret of at least 32 bytes}
       
       # Optional
       - DDNS_TITLE=My DynDNS Server
@@ -131,10 +234,10 @@ Example: `ns.example.com`
 Default TTL (Time To Live) for DNS records in seconds.  
 Example: `3600` (1 hour)
 
-#### Security Variables (Recommended)
+#### Required Session Secret
 
 **`DDNS_SESSION_SECRET`**  
-Secret key for session encryption. Should be 32+ random characters.
+Persistent secret for signing session cookies. **At least 32 bytes are required**; startup fails if it is missing or too short.
 
 Generate with:
 ```bash
@@ -145,7 +248,7 @@ openssl rand -base64 32
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-⚠️ **Important:** Without this variable, sessions won't persist across container restarts.
+Keep the same value across container restarts. Changing it invalidates existing sessions. This is separate from the certificate encryption key.
 
 #### Optional Variables
 
@@ -214,7 +317,7 @@ ns                       IN AAAA    2001:db8::10
 - **Remember Me**: Optional 30-day session duration
 - **Proper Logout**: Destroys sessions completely
 - **HTTPS Enforcement**: Automatic redirect to HTTPS when available
-- **Reverse Proxy Support**: Detects SSL via X-Forwarded-Proto headers
+- **Reverse Proxy Support**: Detects SSL via headers from explicitly trusted proxies
 
 ### Security Dashboard
 
@@ -239,6 +342,8 @@ The admin panel is accessible at `/@/` (not `/admin/` - more unique, less common
 - 🏠 **Dashboard** (`/@/`) - Overview and quick access
 - 📝 **Hosts** (`/@/hosts`) - Manage DNS hosts with automatic lowercase migration
 - 🔗 **CNAMEs** (`/@/cnames`) - Manage CNAME records
+- **DNS records** (`/@/records`) - Manage static RRsets
+- **Certificates** (`/@/certs`) - Configure automatic issuance, issue host certificates, and download packages
 - 📊 **Logs** (`/@/logs`) - View update history
 - 🔒 **Security** (`/@/security`) - Monitor threats and blocked IPs
 - ⏏️ **Logout** (`/@/logout`) - End session securely
@@ -280,6 +385,19 @@ Or with authentication in URL:
 http://username:password@dyndns.example.com:8080/update?hostname=blog.dyndns.example.com&myip=1.2.3.4
 ```
 
+### IPv6 and Dual-Stack Updates
+
+Send an IPv6 address in `myip` to update AAAA:
+
+```bash
+curl -u username:password \
+  "https://dyndns.example.com/nic/update?hostname=blog.dyndns.example.com&myip=2001:db8::10"
+```
+
+For dual-stack hosts, send a separate request with the IPv4 address to update A.
+Each request changes only its own address family. All four update endpoints
+support both families; no separate AAAA endpoint is needed.
+
 ### Without IP Address (Auto-detect)
 
 If your router/device doesn't support sending the IP address (e.g., OpenWRT), omit the `myip` parameter:
@@ -293,7 +411,7 @@ Or with authentication:
 http://username:password@dyndns.example.com:8080/update?hostname=blog.dyndns.example.com
 ```
 
-The server will automatically use the client's IP address from the request.
+The server automatically uses the client address from the request. Forwarded client addresses are accepted only from configured `DDNS_TRUSTED_PROXIES`; otherwise the immediate peer address is used. Send `myip` explicitly when a proxy cannot reliably convey the client’s address family.
 
 ### Authentication
 
@@ -374,6 +492,11 @@ When accessing `/@/hosts` for the first time, the system automatically migrates 
 The application intelligently detects HTTPS availability and adjusts behavior accordingly.
 
 ### HTTPS Detection Methods
+
+Set `DDNS_TRUSTED_PROXIES` to the exact IPs/CIDRs of your reverse proxies as seen
+by the container. Forwarded headers are ignored from other peers. Certificate
+downloads require HTTPS even when other admin pages allow HTTP fallback.
+
 
 1. Direct TLS connection (`request.TLS`)
 2. `X-Forwarded-Proto` header
@@ -531,8 +654,8 @@ If migrating from `dprandzioch/docker-ddns` or older versions of this fork:
    - Add `DDNS_SESSION_SECRET` environment variable
    - Login via web form instead of browser popup
 
-3. **New Recommended Variable**: `DDNS_SESSION_SECRET`
-   - Required for session persistence
+3. **Required Variable**: `DDNS_SESSION_SECRET`
+   - Required at startup, with at least 32 bytes; preserve it across restarts
    - Generate: `openssl rand -base64 32`
 
 ### Migration Steps
@@ -555,7 +678,7 @@ If migrating from `dprandzioch/docker-ddns` or older versions of this fork:
 
 ⚠️ **Manual Update Required:**
 - Bookmark/link updates for admin panel
-- Addition of session secret (recommended)
+- Addition of a persistent session secret (required)
 
 ---
 
@@ -564,7 +687,10 @@ If migrating from `dprandzioch/docker-ddns` or older versions of this fork:
 ### Login Issues
 
 **Problem:** Login redirects back to login page  
-**Solution:** Ensure `DDNS_SESSION_SECRET` is set. Without it, sessions won't persist.
+**Solution:** Preserve `DDNS_SESSION_SECRET` across restarts and verify proxy HTTPS detection.
+
+**Problem:** Container exits with `DDNS_SESSION_SECRET must contain at least 32 bytes`
+**Solution:** Generate a secret with `openssl rand -base64 32`, store it in your deployment environment, and recreate the container with that persistent value.
 
 **Problem:** Can't remember admin password  
 **Solution:** Regenerate password with `htpasswd -nb username newpassword` and update `DDNS_ADMIN_LOGIN`
@@ -572,7 +698,7 @@ If migrating from `dprandzioch/docker-ddns` or older versions of this fork:
 ### HTTPS Issues
 
 **Problem:** HTTPS redirect loop  
-**Solution:** Verify reverse proxy sends `X-Forwarded-Proto: https` header
+**Solution:** Verify the reverse proxy sends `X-Forwarded-Proto: https` and its source IP is listed in `DDNS_TRUSTED_PROXIES`
 
 **Problem:** "Not Secure" warning  
 **Solution:** Check SSL certificate configuration in your reverse proxy
@@ -787,95 +913,3 @@ Have an idea? [Open an issue](https://github.com/w3K-one/docker-ddns-server/issu
 ---
 
 **Made with ❤️ by the community**
-
-## DNS records and certificates (v2.1.0)
-
-The **DNS records** icon opens static RRset management for A, AAAA, CNAME, TXT, MX,
-SRV, CAA and delegated NS records. Select a managed zone, use `@` for its root,
-and enter one value per line. Saving replaces that name/type's complete RRset;
-other record types are preserved. TXT is entered without surrounding quotes;
-long strings are split into DNS character strings automatically. MX uses
-`10 mail.example.net`, SRV uses `10 5 443 service.example.net` at `_service._tcp`,
-and CAA uses `0 issue letsencrypt.org`. NS records are for subzone delegation;
-apex NS and SOA remain owned by BIND setup. In-zone MX/NS targets need valid
-address/glue records before BIND accepts the delegation or mail routing.
-
-Existing DDNS addresses and host-linked CNAMEs remain on their original pages.
-Static records cannot overwrite their address/alias RRsets. Hosts can have TXT,
-MX and other non-conflicting records; deleting a host preserves those records.
-All four legacy update endpoints still accept IPv4 for A and IPv6 for AAAA.
-A dual-stack client sends one request per address family; neither erases the other.
-
-### Automatic zone certificates, dedicated host certificates
-
-Open **Certificates → Automatic certificates**, enter a contact email, choose
-RSA-2048 or EC P-256, accept the CA subscriber agreement and enable the policy.
-The app maintains **one certificate containing the apex and wildcard per managed
-zone**. A one-minute scheduler issues missing zone certificates serially and
-renews opted-in certificates within 30 days of expiry (or after two-thirds of
-their lifetime for short-lived certificates). Failed attempts back off
-from one hour to 24 hours. Removing a managed zone stops its automatic renewals.
-Disabling automatic issuance leaves existing certificates' renewal settings intact.
-Certificate automation starts disabled until that one-time setup is completed.
-
-For client infrastructure, use **Issue** on the host row or **New certificate**
-with that single hostname. Automatic renewal is selected by default. The host row
-then offers **ZIP**, containing `cert.pem`, `chain.pem`, `fullchain.pem` and
-`privkey.pem`. **Host ZIP links never fall back to zone wildcards or multi-name
-certificates**, and never select staging certificates. Wildcard ZIPs remain
-available only from the admin Certificates page for the operator's own use.
-All certificate endpoints require an authenticated admin session.
-
-The Certificates page also provides individual PEM downloads, manual renewal /
-reissue (with a fresh private key), revocation and an activity history. Failed
-renewals preserve the previous certificate/key until replacement succeeds.
-Downloads require HTTPS, are marked `no-store`, and are audited. Devices still
-need their renewed certificate/key installed separately; this release does not
-push certificates to gateways or add a public certificate download API.
-
-DNS-01 uses exact-value TXT updates, preserving unrelated TXT and concurrent
-apex/wildcard challenge values. Interrupted challenges are journaled for cleanup.
-Names must be within `DDNS_DOMAINS`; public delegation must reach this BIND server,
-and any CAA policy must permit Let's Encrypt. Authoritative NS checks normally
-use public DNS; an explicit authoritative endpoint can be configured below.
-
-### Optional configuration and key backups
-
-No new required environment variable is introduced. Certificate and account keys
-are encrypted with AES-256-GCM. On first use of this release, a separate random
-key is persisted as `/root/database/cert.key` with mode 0600, alongside the SQLite
-DB on the existing volume. **Back up the whole database volume, including
-`cert.key`**. Losing that file makes stored private keys unrecoverable. Restoring
-an existing certificate database without its key disables certificate features
-rather than silently creating a replacement key. DNS continues operating if
-certificate setup fails.
-
-| Variable | Purpose |
-|---|---|
-| `DDNS_ACME_EMAIL` | Prefills the certificate contact email |
-| `DDNS_CERT_KEY` | Optional 64-character hexadecimal encryption key instead of the persisted key file; keep stable and back it up |
-| `DDNS_ACME_DIRECTORY` | Optional fixed ACME directory override, primarily for isolated Pebble tests; overrides the staging checkbox |
-| `DDNS_ACME_AUTHORITATIVE_NS` | Optional authoritative DNS server, with optional port, for direct TXT propagation checks |
-| `DDNS_ACME_RESOLVERS` | Optional comma-separated recursive resolver endpoints for ACME DNS lookup |
-| `DDNS_TRUSTED_PROXIES` | Exact reverse-proxy IPs/CIDRs permitted to report HTTPS/client-IP headers; necessary for HTTPS downloads behind a proxy |
-| `DDNS_ALLOW_INSECURE_DOWNLOAD` | `true` only in isolated LAN tests; default false |
-
-Do not change `DDNS_CERT_KEY` or the persisted key file without re-encrypting the
-stored keys. The session-cookie secret is separate and does not encrypt certificates.
-For production updates use Chimera; preserve the existing database and BIND volumes.
-Do not remove the existing acme.sh jobs until their clients have migrated.
-
-### Verification
-
-```sh
-cd dyndns && go test -race ./... && go vet ./...
-cd ..
-docker build -f deployment/Dockerfile -t ddns-features-test:local .
-python3 tests/m0_smoke.py ddns-features-test:local
-python3 tests/features_smoke.py ddns-features-test:local
-```
-
-The feature smoke test creates disposable BIND and Pebble containers, uses fixture
-credentials, and verifies actual DNS-01 issuance, EC/RSA wildcard+apex certificates,
-renewal/key rotation, revocation and downloads. It never contacts Let's Encrypt
-production. `--keep` leaves a local preview running until Enter is pressed.
