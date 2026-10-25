@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -28,13 +29,21 @@ func (h *Handler) ShowLoginPage(c echo.Context) error {
 
 	// Check if there's an error message from failed login
 	errorMsg := c.QueryParam("error")
+	google, passkeys, origin := false, false, ""
+	if h.AdminAuth != nil {
+		google = h.AdminAuth.OAuth != nil
+		passkeys = true
+		origin = h.AdminAuth.Origin
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
 
 	return c.Render(http.StatusOK, "login", echo.Map{
-		"title":        h.Title,
-		"logoPath":     h.LogoPath,
-		"poweredBy":    h.PoweredBy,
-		"poweredByUrl": h.PoweredByUrl,
-		"error":        errorMsg,
+		"title":         h.Title,
+		"logoPath":      h.LogoPath,
+		"poweredBy":     h.PoweredBy,
+		"poweredByUrl":  h.PoweredByUrl,
+		"error":         errorMsg,
+		"googleEnabled": google, "passkeysEnabled": passkeys, "authOrigin": origin,
 	})
 }
 
@@ -61,35 +70,7 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 		return c.Redirect(http.StatusFound, "/@/login?error=invalid_credentials")
 	}
 
-	// Authentication successful - create session
-	sess, err := h.GetSession(c)
-	if err != nil {
-		log.Error("Session creation error:", err)
-		return c.Redirect(http.StatusFound, "/@/login?error=session_error")
-	}
-
-	// Set session values
-	sess.Values[SessionUserKey] = username
-	sess.Values[SessionAuthKey] = true
-	sess.Values[SessionCreatedAt] = time.Now().Unix()
-
-	// Set expiration based on remember me
-	if rememberMe {
-		sess.Options.MaxAge = 30 * 24 * 60 * 60 // 30 days
-		sess.Values[SessionExpiresAt] = time.Now().Add(30 * 24 * time.Hour).Unix()
-	} else {
-		sess.Options.MaxAge = 24 * 60 * 60 // 24 hours
-		sess.Values[SessionExpiresAt] = time.Now().Add(24 * time.Hour).Unix()
-	}
-
-	// Set secure flag if using HTTPS
-	if h.IsHTTPS(c) {
-		sess.Options.Secure = true
-	}
-
-	// Save session
-	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		log.Error("Session save error:", err)
+	if err := h.newAdminSession(c, authPrincipal{Provider: "password", Subject: username}, rememberMe); err != nil {
 		return c.Redirect(http.StatusFound, "/@/login?error=session_error")
 	}
 
@@ -97,7 +78,7 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 
 	// Redirect to originally requested page or default to hosts
 	redirect := c.QueryParam("redirect")
-	if redirect == "" || redirect == "/@/login" {
+	if !strings.HasPrefix(redirect, "/@/") || strings.ContainsAny(redirect, "\\\r\n") || strings.Contains(redirect, "..") || redirect == "/@/login" {
 		redirect = "/@/hosts"
 	}
 	return c.Redirect(http.StatusFound, redirect)
@@ -166,6 +147,20 @@ func (h *Handler) IsAuthenticated(c echo.Context) bool {
 	if expiresAt, ok := sess.Values[SessionExpiresAt].(int64); ok {
 		if time.Now().Unix() > expiresAt {
 			log.Info("Session expired")
+			return false
+		}
+	}
+
+	p := principalFromSession(sess)
+	if p.Provider != "" && !h.principalAllowed(p) {
+		return false
+	}
+	if p.Passkey != "" {
+		if h.AdminAuth == nil {
+			return false
+		}
+		var count int64
+		if h.DB.Model(&AdminPasskey{}).Where("id = ? AND revoked_at IS NULL", p.Passkey).Count(&count).Error != nil || count != 1 {
 			return false
 		}
 	}

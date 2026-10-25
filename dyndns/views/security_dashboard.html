@@ -1,4 +1,5 @@
 {{define "content"}}
+{{if .authOrigin}}<p><a class="btn btn-outline-primary" href="{{.authOrigin}}/@/auth/passkeys">Manage passkeys</a></p>{{end}}
 <div class="container marketing">
     <h3 class="text-center mb-4">Security Dashboard</h3>
     

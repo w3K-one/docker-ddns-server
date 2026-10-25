@@ -681,3 +681,32 @@ The October 25 outage was the October 19 image's mandatory session-secret check:
 the deployed Chimera stack had no DDNS_SESSION_SECRET. The operator added it and
 redeployed through Chimera; /ping subsequently returned OK with zero restarts.
 Chimera's stack file lives on Hydra, not Furia (correcting section 8's older path note).
+
+
+## Google and passkey authentication update
+
+`handler/admin_auth.go` adds optional Google OIDC and WebAuthn using maintained
+coreos/go-oidc and go-webauthn packages. `DDNS_AUTH_ORIGIN` binds WebAuthn RP ID and
+origin and fixes the Google callback; Google client ID/secret and an exact email
+allowlist enable Google independently. The original password and client Basic
+Auth paths remain available. Build tooling now uses Go 1.27 (module minimum 1.26).
+
+New SQLite tables: `admin_identities` (stable random WebAuthn user handle),
+`admin_passkeys` (full public credential JSON, source identity, labels, use/revocation
+timestamps) and `google_identities` (verified email to stable subject pins).
+All configured identities map to the existing single administrator; no new roles
+or public accounts exist. Source authorization is rechecked on every request,
+including sessions created by a passkey. Credential revocation invalidates its
+sessions. Enrollment/removal require a fresh, authenticated session and exact
+request Origin. Login assertions require authenticator user verification.
+
+The `/@/auth/*` route group enforces canonical HTTPS, POST Origin, body limits,
+rate limiting and no-store responses. One-use, five-minute server-memory flows
+are bound to a Secure/HttpOnly host-only cookie; registration is also bound to
+the initiating admin session. Google flow state, nonce, PKCE, issuer, audience,
+signature, verified email and subject pins are validated. Google callback ends
+on a same-origin completion page before navigating with the Strict admin cookie.
+Only the transient flow cookie is SameSite=Lax. Main access logs now use route
+paths, never raw query strings. Real credential enrollment needs the operator's
+own device interaction; tests use signed synthetic WebAuthn ceremonies and a
+local signed OIDC issuer/token response, never real user credentials.

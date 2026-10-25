@@ -100,6 +100,7 @@ jobs:
         with:
           tag_name: ${{ steps.get_version.outputs.TAG }}
           name: Release ${{ steps.get_version.outputs.TAG }}
+          target_commitish: ${{ github.sha }}
           body: |
             Docker Image: `${{ env.DOCKER_IMAGE_NAME }}:${{ steps.get_version.outputs.TAG }}`
             

@@ -21,7 +21,7 @@ func main() {
 
 	e.Logger.SetLevel(log.ERROR)
 
-	e.Use(middleware.Logger())
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{Format: "${time_rfc3339} ${method} ${path} ${status} ${latency_human}\n"}))
 
 	// Set Renderer with custom template functions
 	e.Renderer = echoview.New(goview.Config{
@@ -71,6 +71,10 @@ func main() {
 	// Parse environment variables and initialize session store
 	authAdmin, err := h.ParseEnvs()
 	if err != nil {
+		e.Logger.Fatal(err)
+	}
+
+	if err := h.InitAdminAuth(); err != nil {
 		e.Logger.Fatal(err)
 	}
 
@@ -136,6 +140,7 @@ func main() {
 	}
 
 	h.FeatureRoutes(e.Group("/@"))
+	h.AdminAuthRoutes(e)
 
 	// DynDNS API endpoints (HTTP allowed, BasicAuth required)
 	// These endpoints are used by routers/NVRs and need BasicAuth

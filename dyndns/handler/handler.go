@@ -24,6 +24,7 @@ import (
 )
 
 type Handler struct {
+	AdminAuth        *AdminAuth
 	DB               *gorm.DB
 	Records          *records.Store
 	Certificates     *certificates.Service

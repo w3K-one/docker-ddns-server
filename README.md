@@ -25,7 +25,7 @@ With docker-ddns-server you can set up your own dynamic DNS server. This project
 - **Dual-Stack DDNS** - Independent IPv4 and IPv6 client updates
 - **Let’s Encrypt Certificates** - Automatic zone wildcard issuance and renewal, dedicated host certificates, and ZIP/PEM downloads
 - **Security & IP Blocking** - Automatic protection against brute-force attacks
-- **Modern Authentication** - Session-based admin login with HTTPS support
+- **Modern Authentication** - Admin password, optional Google sign-in and passkeys with HTTPS support
 - **Security Dashboard** - Real-time monitoring of threats and blocked IPs
 - **Multi-Platform Support** - Runs on amd64, arm64, arm (Raspberry Pi compatible)
 - **Automatic Migration** - Handles legacy data with automatic normalization
@@ -125,6 +125,75 @@ The feature smoke test creates disposable BIND and Pebble containers, uses fixtu
 credentials, and verifies actual DNS-01 issuance, EC/RSA wildcard+apex certificates,
 renewal/key rotation, revocation and downloads. It never contacts Let's Encrypt
 production. `--keep` leaves a local preview running until Enter is pressed.
+
+---
+
+## Google sign-in and passkeys
+
+Admin login supports optional **Google OpenID Connect** and **WebAuthn passkeys**.
+The existing admin password remains available for recovery, and routers continue
+using their existing per-host HTTP Basic credentials. These features do not add
+public registration or grant DDNS clients admin access.
+
+Choose one HTTPS origin for admin sign-in, for example `https://ddns.example.com`.
+Passkeys are bound to that hostname; other managed DNS zones do not get access to
+its credentials. Links from another site alias lead to the canonical sign-in
+origin. Set the exact reverse proxy addresses in `DDNS_TRUSTED_PROXIES` as usual.
+
+| Variable | Purpose |
+|---|---|
+| `DDNS_AUTH_ORIGIN` | Canonical HTTPS origin, with no path; enables passkey enrollment/sign-in |
+| `DDNS_GOOGLE_CLIENT_ID` | Google OAuth web application's client ID |
+| `DDNS_GOOGLE_CLIENT_SECRET` | Google OAuth web application's secret; store in deployment secrets, never Git |
+| `DDNS_GOOGLE_ALLOWED_EMAILS` | Required comma-separated exact administrator emails; no wildcard or domain-wide signup |
+
+For Google sign-in, configure all three Google variables and register this exact
+**authorized redirect URI** on the OAuth web client:
+
+```text
+https://ddns.example.com/@/auth/google/callback
+```
+
+Use the same origin as `DDNS_AUTH_ORIGIN`, with the real hostname substituted.
+Only `openid` and `email` scopes are requested. Google email must be verified and
+explicitly allowed. The first successful sign-in pins its stable Google subject;
+a new Google account taking over the same email is rejected. The allowlist is
+checked on every admin request, so removing an email also revokes its existing
+Google sessions and any passkeys enrolled through that identity. To deliberately
+replace an account, back up the database and have an operator remove that email's
+row from `google_identities` before signing in with the replacement account.
+
+To enroll a passkey:
+
+1. Sign in on the canonical HTTPS origin with your password or Google account.
+2. Open **Security → Manage passkeys** within five minutes of signing in.
+3. Give the passkey a recognizable name and choose **Add passkey**.
+4. Complete your device's fingerprint, face, PIN or security-key prompt yourself.
+
+Use **Sign in with a passkey** on subsequent visits. Enrollment requires a
+resident credential and user verification. A passkey can be removed from the same
+page after a fresh sign-in; removing it invalidates sessions created with it.
+This revokes access on the server; remove its saved entry from your authenticator separately if desired.
+Back up the database volume: it contains the random user handle, public credential
+records, Google identity pins and revocation state. Passkey private keys never
+leave the authenticator. Synced passkeys are supported; keep a recovery sign-in
+method available before replacing devices.
+
+The short-lived OAuth/WebAuthn challenges are browser-bound, stored only in
+server memory and consumed once; restarting the app requires restarting any
+unfinished sign-in. OAuth uses PKCE, state and nonce validation; admin session
+cookies remain Secure on HTTPS, HttpOnly and SameSite=Strict. Only the temporary
+OAuth flow cookie uses SameSite=Lax for the Google callback. Access logs omit query
+strings so authorization codes and state values are not written to container logs.
+
+With no auth variables set, the existing deployment behavior is unchanged.
+Partial/invalid Google configuration fails startup instead of granting open
+access. `DDNS_ADMIN_LOGIN` and `DDNS_SESSION_SECRET` remain required when these
+additional sign-in methods are enabled. This release upgrades the build to Go 1.27
+for the maintained WebAuthn library.
+
+References: [Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect)
+and [go-webauthn](https://github.com/go-webauthn/webauthn).
 
 ---
 

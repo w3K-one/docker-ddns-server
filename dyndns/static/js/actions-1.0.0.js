@@ -151,7 +151,8 @@ $(document).ready(function(){
     if (urlPath === "") {
         urlPath = "hosts"
     }
-    document.getElementsByClassName("nav-"+urlPath)[0].classList.add("active");
+    const activeNav = document.getElementsByClassName("nav-"+urlPath)[0];
+    if (activeNav) activeNav.classList.add("active");
 });
 
 // ===== UTILITY FUNCTIONS (outside document.ready is OK) =====
