@@ -2,37 +2,37 @@
 $(document).ready(function(){
     
     // ===== HOST BUTTONS =====
-    $("button.addHost").click(function () {
+    $(document).on("click", "button.addHost", function () {
         location.href='/@/hosts/add';
     });
 
-    $("button.editHost").click(function () {
+    $(document).on("click", "button.editHost", function () {
         location.href='/@/hosts/edit/' + $(this).attr('id');
     });
 
-    $("button.deleteHost").click(function () {
+    $(document).on("click", "button.deleteHost", function () {
         $.ajax({
             contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
             type: 'GET',
             url: "/@/hosts/delete/" + $(this).attr('id')
         }).done(function(data, textStatus, jqXHR) {
-            location.href="/@/hosts";
+            if(window.refreshLists) window.refreshLists(); else location.href="/@/hosts";
         }).fail(function(jqXHR, textStatus, errorThrown) {
             alert("Error: " + $.parseJSON(jqXHR.responseText).message);
             location.reload()
         });
     });
 
-    $("button.showHostLog").click(function () {
+    $(document).on("click", "button.showHostLog", function () {
         location.href='/@/logs/host/' + $(this).attr('id');
     });
 
     // ===== CNAME BUTTONS =====
-    $("button.addCName").click(function () {
+    $(document).on("click", "button.addCName", function () {
         location.href='/@/cnames/add';
     });
 
-    $("button.deleteCName").click(function () {
+    $(document).on("click", "button.deleteCName", function () {
         $.ajax({
             contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
             type: 'GET',
@@ -46,7 +46,7 @@ $(document).ready(function(){
     });
 
     // ===== ADD/EDIT FORM BUTTONS =====
-    $("button.add, button.edit").click(function () {
+    $(document).on("click", "button.add, button.edit", function () {
         let id = $(this).attr('id');
         if (id !== "") {
             id = "/"+id
@@ -94,7 +94,7 @@ $(document).ready(function(){
     });
 
     // ===== CLIPBOARD BUTTONS =====
-    $("button.copyToClipboard").click(function () {
+    $(document).on("click", "button.copyToClipboard", function () {
         let id;
         if ($(this).hasClass('username')) {
             id = "username";
@@ -108,7 +108,7 @@ $(document).ready(function(){
         document.execCommand("copy");
     });
 
-    $("button.copyUrlToClipboard").click(function () {
+    $(document).on("click", "button.copyUrlToClipboard", function () {
         let id = $(this).attr('id');
         let hostname = document.getElementById('host-hostname_'+id).innerHTML
         let domain = document.getElementById('host-domain_'+id).innerHTML
@@ -126,7 +126,7 @@ $(document).ready(function(){
     });
 
     // ===== GENERATE HASH BUTTONS =====
-    $("button.generateHash").click(function () {
+    $(document).on("click", "button.generateHash", function () {
         let id;
         if ($(this).hasClass('username')) {
             id = "username";

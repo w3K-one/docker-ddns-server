@@ -1,0 +1,11 @@
+{{define "content"}}
+<style>
+.header nav { display: none; }
+#notfound-game:not(.is-fs) { max-width:850px; margin:0 auto; }
+</style>
+<div id="notfound-game"></div>
+<script src="/static/js/w3k-404.js?v=1.5.9"></script>
+<script>
+w3kPacman404('#notfound-game', {homeUrl:'/@/hosts', homeLabel:'← Back to DDNS', scoreboard:''});
+</script>
+{{end}}

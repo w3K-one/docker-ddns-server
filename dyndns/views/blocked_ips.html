@@ -81,7 +81,7 @@ $(document).ready(function() {
                 success: function(result) {
                     console.log('Unblock success:', result);
                     alert('IP ' + ip + ' has been unblocked successfully!');
-                    location.reload();
+                    if (window.refreshLists) window.refreshLists(); else location.reload();
                 },
                 error: function(xhr, status, error) {
                     console.error('Unblock failed:', xhr.responseText);

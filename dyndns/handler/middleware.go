@@ -111,6 +111,7 @@ func (h *Handler) UpdateAuthMiddleware() echo.MiddlewareFunc {
 			username, password, ok := c.Request().BasicAuth()
 
 			if !ok {
+				h.recordRequestFailure(c, http.StatusUnauthorized, "Missing or malformed Basic authentication")
 				// No credentials provided - this is NOT a failed auth attempt
 				// It's a misconfigured client or direct browser access
 				return c.String(http.StatusUnauthorized, "badauth\n")
@@ -121,6 +122,7 @@ func (h *Handler) UpdateAuthMiddleware() echo.MiddlewareFunc {
 
 			// If there was a system error (not wrong credentials), don't log as failed auth
 			if authError != nil {
+				h.recordRequestFailure(c, http.StatusUnauthorized, "Authentication service unavailable")
 				log.Errorf("Authentication system error: %v", authError)
 				return c.String(http.StatusUnauthorized, "badauth\n")
 			}
@@ -133,7 +135,7 @@ func (h *Handler) UpdateAuthMiddleware() echo.MiddlewareFunc {
 				log.Warnf("Failed DynDNS API authentication from IP %s, username: %s", clientIP, username)
 
 				// Log the failed attempt (but DON'T trigger IP blocking for API endpoints)
-				h.LogFailedAuth(clientIP, c.Request().UserAgent(), c.Path(), username, password)
+				h.LogFailedAuth(clientIP, c.Request().UserAgent(), c.Path(), username, password, c.QueryParam("hostname"))
 
 				return c.String(http.StatusUnauthorized, "badauth\n")
 			}

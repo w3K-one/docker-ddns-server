@@ -11,7 +11,7 @@ import (
 func (h *Handler) ShowSecurityDashboard(c echo.Context) error {
 
 	// Get recent failed auths
-	failedAuths, err := h.GetRecentFailedAuths(50)
+	failedAuths, err := h.GetRecentFailedAuths(-1)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
@@ -31,7 +31,8 @@ func (h *Handler) ShowSecurityDashboard(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "security_dashboard", echo.Map{
-		"failedAuths":  failedAuths,
+		"failedAuths":  collapseFailedAuths(failedAuths),
+		"failedCount":  len(failedAuths),
 		"blockedIPs":   blockedIPs,
 		"activeBlocks": activeBlocks,
 		"authOrigin":   h.adminAuthOrigin(),
@@ -63,13 +64,14 @@ func (h *Handler) ShowBlockedIPs(c echo.Context) error {
 func (h *Handler) ShowFailedAuths(c echo.Context) error {
 	// Auth check removed - middleware handles this
 
-	failedAuths, err := h.GetRecentFailedAuths(100)
+	failedAuths, err := h.GetRecentFailedAuths(-1)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
 	return c.Render(http.StatusOK, "failed_auths", echo.Map{
-		"failedAuths":  failedAuths,
+		"failedAuths":  collapseFailedAuths(failedAuths),
+		"failedCount":  len(failedAuths),
 		"title":        h.Title,
 		"logoPath":     h.LogoPath,
 		"poweredBy":    h.PoweredBy,

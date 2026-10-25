@@ -1,16 +1,16 @@
 {{define "content"}}
-{{if .authOrigin}}<p><a class="btn btn-outline-primary" href="{{.authOrigin}}/@/auth/passkeys">Manage passkeys</a></p>{{end}}
 <div class="container marketing">
+{{if .authOrigin}}<p class="security-passkeys"><a class="btn btn-outline-primary" href="{{.authOrigin}}/@/auth/passkeys">Manage passkeys</a></p>{{end}}
     <h3 class="text-center mb-4">Security Dashboard</h3>
     
     <!-- Summary Cards -->
-    <div class="row mb-4">
+    <div class="row mb-4 security-summary">
         <div class="col-md-4">
             <div class="card text-white bg-danger mb-3">
                 <div class="card-header">Active Blocks</div>
                 <div class="card-body">
                     <h2 class="card-title">{{.activeBlocks}}</h2>
-                    <p class="card-text">IP addresses currently blocked</p>
+                    <p class="card-text">Blocked IPs</p>
                 </div>
             </div>
         </div>
@@ -18,8 +18,8 @@
             <div class="card text-white bg-warning mb-3">
                 <div class="card-header">Failed Attempts</div>
                 <div class="card-body">
-                    <h2 class="card-title">{{len .failedAuths}}</h2>
-                    <p class="card-text">Recent failed login attempts</p>
+                    <h2 class="card-title">{{.failedCount}}</h2>
+                    <p class="card-text">Failed Login Attempts</p>
                 </div>
             </div>
         </div>
@@ -28,7 +28,7 @@
                 <div class="card-header">Total Blocks</div>
                 <div class="card-body">
                     <h2 class="card-title">{{len .blockedIPs}}</h2>
-                    <p class="card-text">Total IP blocks (active + expired)</p>
+                    <p class="card-text">Total Blocked IPs</p>
                 </div>
             </div>
         </div>
@@ -138,6 +138,11 @@
             border-top-color: #2c3e50;
         }
         
+        .hostname-tooltip { cursor: help; }
+        .hostname-tooltip .speech-tooltip { width: max-content; max-width: min(320px, 80vw); overflow-wrap: anywhere; }
+        .hostname-tooltip:hover .speech-tooltip,
+        .hostname-tooltip:focus .speech-tooltip { opacity: 1; visibility: visible; }
+
         /* Show tooltip when active */
         .speech-tooltip.active {
             opacity: 1;
@@ -226,8 +231,8 @@
                 {{end}}
             {{end}}
             <tr class="{{$rowClass}}">
-                <td>{{$auth.Timestamp.Format "01/02/2006 15:04:05"}}</td>
-                <td><code>{{$auth.IPAddress}}</code></td>
+                <td>{{$auth.Timestamp.Format "01/02/2006 15:04:05"}} {{if gt $auth.RepeatCount 1}}<span class="badge badge-secondary" title="Repeated attempts">×{{$auth.RepeatCount}}</span>{{end}}</td>
+                <td><span class="tooltip-container hostname-tooltip" tabindex="0" aria-describedby="failed-host-{{$auth.ID}}"><code>{{$auth.IPAddress}}</code><span class="speech-tooltip" role="tooltip" id="failed-host-{{$auth.ID}}">{{if $auth.Hostname}}{{$auth.Hostname}}{{else}}Hostname not recorded{{end}}</span></span></td>
                 <td>{{if $auth.Username}}{{$auth.Username}}{{else}}<em>none</em>{{end}}</td>
                 <td>
                     {{if $auth.Password}}
@@ -341,7 +346,7 @@ $(document).ready(function() {
                 success: function(result) {
                     console.log('Unblock success:', result);
                     alert('IP ' + ip + ' has been unblocked successfully!');
-                    location.reload();
+                    if (window.refreshLists) window.refreshLists(); else location.reload();
                 },
                 error: function(xhr, status, error) {
                     console.error('Unblock error:', xhr.responseText);

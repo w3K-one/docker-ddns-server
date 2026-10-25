@@ -7,6 +7,7 @@ import (
 	"github.com/w3K-one/docker-ddns-server/dyndns/nswrapper"
 	"github.com/w3K-one/docker-ddns-server/dyndns/records"
 	"gorm.io/gorm/logger"
+	"sync"
 
 	"github.com/labstack/gommon/log"
 
@@ -24,6 +25,8 @@ import (
 )
 
 type Handler struct {
+	proxyMu          sync.Mutex
+	proxyError       string
 	AdminAuth        *AdminAuth
 	DB               *gorm.DB
 	Records          *records.Store
