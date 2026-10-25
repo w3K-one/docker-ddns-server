@@ -3,7 +3,9 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"github.com/w3K-one/docker-ddns-server/dyndns/certificates"
 	"github.com/w3K-one/docker-ddns-server/dyndns/nswrapper"
+	"github.com/w3K-one/docker-ddns-server/dyndns/records"
 	"gorm.io/gorm/logger"
 
 	"github.com/labstack/gommon/log"
@@ -23,6 +25,8 @@ import (
 
 type Handler struct {
 	DB               *gorm.DB
+	Records          *records.Store
+	Certificates     *certificates.Service
 	TrustedProxies   nswrapper.TrustedProxies
 	deleteRecords    func([]string, string, bool) error
 	AuthAdmin        bool
@@ -190,8 +194,16 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 	}
 
 	h.Config.Domains = strings.Split(os.Getenv("DDNS_DOMAINS"), ",")
-	if len(h.Config.Domains) < 1 {
+	if strings.TrimSpace(os.Getenv("DDNS_DOMAINS")) == "" {
 		return adminAuth, fmt.Errorf("environment variable DDNS_DOMAINS has to be set")
+	}
+
+	for i, domain := range h.Config.Domains {
+		domain = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
+		if !nswrapper.ValidName(domain, false) {
+			return adminAuth, fmt.Errorf("invalid managed domain")
+		}
+		h.Config.Domains[i] = domain
 	}
 
 	h.TrustedProxies, err = nswrapper.ParseTrustedProxies(os.Getenv("DDNS_TRUSTED_PROXIES"))
@@ -210,17 +222,18 @@ func (h *Handler) ParseEnvs() (adminAuth bool, err error) {
 // InitDB creates an empty database and creates all tables if there isn't already one, or opens the existing one.
 func (h *Handler) InitDB() (err error) {
 	if _, err := os.Stat("database"); os.IsNotExist(err) {
-		err = os.MkdirAll("database", os.ModePerm)
+		err = os.MkdirAll("database", 0700)
 		if err != nil {
 			return err
 		}
 	}
 
-	h.DB, err = gorm.Open(sqlite.Open("database/ddns.db"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	h.DB, err = gorm.Open(sqlite.Open("database/ddns.db?_busy_timeout=5000&_journal_mode=WAL"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return err
 	}
 
+	os.Chmod("database/ddns.db", 0600)
 	err = migrateDatabase(h.DB)
 
 	return err

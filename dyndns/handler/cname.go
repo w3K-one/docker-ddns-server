@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/w3K-one/docker-ddns-server/dyndns/model"
@@ -50,6 +51,10 @@ func (h *Handler) AddCName(c echo.Context) (err error) {
 // adds the cname entry to the database,
 // and adds the entry to the DNS server.
 func (h *Handler) CreateCName(c echo.Context) (err error) {
+	if h.Records != nil {
+		h.Records.Mu.Lock()
+		defer h.Records.Mu.Unlock()
+	}
 	cname := &model.CName{}
 	if err = c.Bind(cname); err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
@@ -64,6 +69,7 @@ func (h *Handler) CreateCName(c echo.Context) (err error) {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
 	}
 
+	cname.Hostname = strings.ToLower(cname.Hostname)
 	cname.Target = *host
 	cname.TargetID = host.ID
 
@@ -89,6 +95,10 @@ func (h *Handler) CreateCName(c echo.Context) (err error) {
 // DeleteCName fetches a cname entry from the database by "id"
 // and deletes the database and DNS server entry to it.
 func (h *Handler) DeleteCName(c echo.Context) (err error) {
+	if h.Records != nil {
+		h.Records.Mu.Lock()
+		defer h.Records.Mu.Unlock()
+	}
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})

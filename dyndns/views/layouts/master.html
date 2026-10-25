@@ -62,6 +62,15 @@
         transform: scale(-1, 1);
         }
 
+        .header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+        .header nav { order:2; margin-left:auto; }
+        .logo { position:static; margin:0; max-height:64px; max-width:160px; object-fit:contain; }
+        .header .nav-link { font-size:1.25rem; min-width:42px; text-align:center; padding:.4rem .55rem; }
+        .header .nav-link:focus-visible { outline:3px solid #0056b3; outline-offset:2px; }
+        .record-card { border:1px solid #dee2e6; border-radius:8px; padding:1rem; margin-bottom:1rem; }
+        .record-card textarea { font-family:monospace; }
+        .feature-toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
+        .cert-names { overflow-wrap:anywhere; }
     </style>
 </head>
 
@@ -71,22 +80,14 @@
     <!-- Navigation -->
     <div class="header clearfix">
         <nav>
-            <ul class="nav nav-pills float-right">
-                <li class="nav-item">
-                    <a class="nav-link nav-hosts" href="/@/hosts">Hosts</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-cnames" href="/@/cnames">CNames</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-logs" href="/@/logs">Logs</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-security" href="/@/security" title="Security"> 🔒 </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-logout" href="/@/logout" id="logout"> ⏏️ </a>
-                </li>
+            <ul class="nav nav-pills float-right" aria-label="Main navigation">
+<li class="nav-item"><a class="nav-link nav-hosts" href="/@/hosts" title="Hosts" aria-label="Hosts"><span aria-hidden="true">⌂</span><span class="sr-only">Hosts</span></a></li>
+<li class="nav-item"><a class="nav-link nav-cnames" href="/@/cnames" title="CNames" aria-label="CNames"><span aria-hidden="true">🔗</span><span class="sr-only">CNames</span></a></li>
+<li class="nav-item"><a class="nav-link nav-records" href="/@/records" title="DNS records" aria-label="DNS records"><span aria-hidden="true">☷</span><span class="sr-only">DNS records</span></a></li>
+<li class="nav-item"><a class="nav-link nav-certs" href="/@/certs" title="Certificates" aria-label="Certificates"><span aria-hidden="true">🛡</span><span class="sr-only">Certificates</span></a></li>
+<li class="nav-item"><a class="nav-link nav-logs" href="/@/logs" title="Update logs" aria-label="Update logs"><span aria-hidden="true">≡</span><span class="sr-only">Update logs</span></a></li>
+<li class="nav-item"><a class="nav-link nav-security" href="/@/security" title="Security" aria-label="Security"><span aria-hidden="true">🔒</span><span class="sr-only">Security</span></a></li>
+<li class="nav-item"><a class="nav-link nav-logout" href="/@/logout" title="Log out" aria-label="Log out"><span aria-hidden="true">⏏</span><span class="sr-only">Log out</span></a></li>
             </ul>
         </nav>
         <!-- Conditionally display logo or title text -->

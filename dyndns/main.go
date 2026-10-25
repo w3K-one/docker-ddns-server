@@ -74,6 +74,9 @@ func main() {
 		e.Logger.Fatal(err)
 	}
 
+	if err := h.InitFeatures(); err != nil {
+		e.Logger.Error("Certificate features unavailable: ", err)
+	}
 	e.IPExtractor = h.TrustedProxies.ClientIP
 
 	// Apply IP blocker middleware globally
@@ -131,6 +134,8 @@ func main() {
 		groupAdmin.GET("/security/failed-auths", h.ShowFailedAuths)
 		groupAdmin.POST("/security/unblock/:ip", h.UnblockIPHandler)
 	}
+
+	h.FeatureRoutes(e.Group("/@"))
 
 	// DynDNS API endpoints (HTTP allowed, BasicAuth required)
 	// These endpoints are used by routers/NVRs and need BasicAuth

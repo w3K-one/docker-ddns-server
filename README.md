@@ -787,3 +787,95 @@ Have an idea? [Open an issue](https://github.com/w3K-one/docker-ddns-server/issu
 ---
 
 **Made with ❤️ by the community**
+
+## DNS records and certificates (v2.1.0)
+
+The **DNS records** icon opens static RRset management for A, AAAA, CNAME, TXT, MX,
+SRV, CAA and delegated NS records. Select a managed zone, use `@` for its root,
+and enter one value per line. Saving replaces that name/type's complete RRset;
+other record types are preserved. TXT is entered without surrounding quotes;
+long strings are split into DNS character strings automatically. MX uses
+`10 mail.example.net`, SRV uses `10 5 443 service.example.net` at `_service._tcp`,
+and CAA uses `0 issue letsencrypt.org`. NS records are for subzone delegation;
+apex NS and SOA remain owned by BIND setup. In-zone MX/NS targets need valid
+address/glue records before BIND accepts the delegation or mail routing.
+
+Existing DDNS addresses and host-linked CNAMEs remain on their original pages.
+Static records cannot overwrite their address/alias RRsets. Hosts can have TXT,
+MX and other non-conflicting records; deleting a host preserves those records.
+All four legacy update endpoints still accept IPv4 for A and IPv6 for AAAA.
+A dual-stack client sends one request per address family; neither erases the other.
+
+### Automatic zone certificates, dedicated host certificates
+
+Open **Certificates → Automatic certificates**, enter a contact email, choose
+RSA-2048 or EC P-256, accept the CA subscriber agreement and enable the policy.
+The app maintains **one certificate containing the apex and wildcard per managed
+zone**. A one-minute scheduler issues missing zone certificates serially and
+renews opted-in certificates within 30 days of expiry (or after two-thirds of
+their lifetime for short-lived certificates). Failed attempts back off
+from one hour to 24 hours. Removing a managed zone stops its automatic renewals.
+Disabling automatic issuance leaves existing certificates' renewal settings intact.
+Certificate automation starts disabled until that one-time setup is completed.
+
+For client infrastructure, use **Issue** on the host row or **New certificate**
+with that single hostname. Automatic renewal is selected by default. The host row
+then offers **ZIP**, containing `cert.pem`, `chain.pem`, `fullchain.pem` and
+`privkey.pem`. **Host ZIP links never fall back to zone wildcards or multi-name
+certificates**, and never select staging certificates. Wildcard ZIPs remain
+available only from the admin Certificates page for the operator's own use.
+All certificate endpoints require an authenticated admin session.
+
+The Certificates page also provides individual PEM downloads, manual renewal /
+reissue (with a fresh private key), revocation and an activity history. Failed
+renewals preserve the previous certificate/key until replacement succeeds.
+Downloads require HTTPS, are marked `no-store`, and are audited. Devices still
+need their renewed certificate/key installed separately; this release does not
+push certificates to gateways or add a public certificate download API.
+
+DNS-01 uses exact-value TXT updates, preserving unrelated TXT and concurrent
+apex/wildcard challenge values. Interrupted challenges are journaled for cleanup.
+Names must be within `DDNS_DOMAINS`; public delegation must reach this BIND server,
+and any CAA policy must permit Let's Encrypt. Authoritative NS checks normally
+use public DNS; an explicit authoritative endpoint can be configured below.
+
+### Optional configuration and key backups
+
+No new required environment variable is introduced. Certificate and account keys
+are encrypted with AES-256-GCM. On first use of this release, a separate random
+key is persisted as `/root/database/cert.key` with mode 0600, alongside the SQLite
+DB on the existing volume. **Back up the whole database volume, including
+`cert.key`**. Losing that file makes stored private keys unrecoverable. Restoring
+an existing certificate database without its key disables certificate features
+rather than silently creating a replacement key. DNS continues operating if
+certificate setup fails.
+
+| Variable | Purpose |
+|---|---|
+| `DDNS_ACME_EMAIL` | Prefills the certificate contact email |
+| `DDNS_CERT_KEY` | Optional 64-character hexadecimal encryption key instead of the persisted key file; keep stable and back it up |
+| `DDNS_ACME_DIRECTORY` | Optional fixed ACME directory override, primarily for isolated Pebble tests; overrides the staging checkbox |
+| `DDNS_ACME_AUTHORITATIVE_NS` | Optional authoritative DNS server, with optional port, for direct TXT propagation checks |
+| `DDNS_ACME_RESOLVERS` | Optional comma-separated recursive resolver endpoints for ACME DNS lookup |
+| `DDNS_TRUSTED_PROXIES` | Exact reverse-proxy IPs/CIDRs permitted to report HTTPS/client-IP headers; necessary for HTTPS downloads behind a proxy |
+| `DDNS_ALLOW_INSECURE_DOWNLOAD` | `true` only in isolated LAN tests; default false |
+
+Do not change `DDNS_CERT_KEY` or the persisted key file without re-encrypting the
+stored keys. The session-cookie secret is separate and does not encrypt certificates.
+For production updates use Chimera; preserve the existing database and BIND volumes.
+Do not remove the existing acme.sh jobs until their clients have migrated.
+
+### Verification
+
+```sh
+cd dyndns && go test -race ./... && go vet ./...
+cd ..
+docker build -f deployment/Dockerfile -t ddns-features-test:local .
+python3 tests/m0_smoke.py ddns-features-test:local
+python3 tests/features_smoke.py ddns-features-test:local
+```
+
+The feature smoke test creates disposable BIND and Pebble containers, uses fixture
+credentials, and verifies actual DNS-01 issuance, EC/RSA wildcard+apex certificates,
+renewal/key rotation, revocation and downloads. It never contacts Let's Encrypt
+production. `--keep` leaves a local preview running until Enter is pressed.

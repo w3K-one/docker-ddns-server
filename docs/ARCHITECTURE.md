@@ -652,3 +652,32 @@ Remaining/outside M0:
 14. Explicit private `myip` remains accepted (`dyndns/handler/host.go:336`).
 15. Domain form choices are not server-side zone authorization; create/edit can leave a saved DB row when DNS fails (`dyndns/handler/host.go:173`, `dyndns/handler/host.go:213`).
 16. No distributed atomic commit exists between SQLite and BIND; commit failure after a successful DNS delete needs reconciliation. Startup process supervision, GET-based destructive admin routes, and cleanup timestamp races are unchanged by this bounded milestone.
+
+## v2.1.0 implementation update (2026-10-25)
+
+Feature A's admin surface is implemented in `handler/features.go`, `records/store.go`
+and `nswrapper/rrset.go`: eight static record types, whole-RRset edits, CNAME/legacy
+ownership checks, quoted TXT/CAA data, type-specific deletion, session auth and CSRF.
+Legacy Host/CName models/routes remain intact; this release does not implement the
+roadmap's token JSON API or migrate CName rows. `records` rows describe static data;
+legacy DDNS addresses are intentionally not duplicated into that table.
+
+Feature B is implemented in `certificates/` with lego, encrypted ACME accounts and
+private keys, asynchronous issuance, exact-value DNS-01 challenges, restart cleanup,
+serial automatic zone wildcard issuance, 30-day renewal, retries, reissue, revoke,
+and audited HTTPS-only downloads. ZIPs contain leaf, chain, fullchain and private key.
+The user explicitly requires zone wildcard keys to remain for operator use:
+`ForHost` selects only a single-SAN, unexpired production certificate matching that
+host. No wildcard fallback or host-credential self-service endpoint is implemented.
+ARI, PFX, outbound notifications and acme.sh migration remain outside this release.
+
+A random encryption key persists in the existing database volume by default; an
+optional hex environment key can override it. No new required startup setting is
+introduced. Certificate configuration errors disable only certificate functionality.
+Automation requires explicit contact-email/CA agreement setup in the admin page.
+See README.md for setup, operational constraints, test commands and backup policy.
+
+The October 25 outage was the October 19 image's mandatory session-secret check:
+the deployed Chimera stack had no DDNS_SESSION_SECRET. The operator added it and
+redeployed through Chimera; /ping subsequently returned OK with zero restarts.
+Chimera's stack file lives on Hydra, not Furia (correcting section 8's older path note).

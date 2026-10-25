@@ -40,6 +40,6 @@ func migrateDatabase(db *gorm.DB) error {
 				}
 			}
 		}
-		return tx.AutoMigrate(&model.Host{}, &model.CName{}, &model.Log{}, &model.FailedAuth{}, &model.BlockedIP{})
+		return tx.AutoMigrate(&model.Host{}, &model.CName{}, &model.Log{}, &model.FailedAuth{}, &model.BlockedIP{}, &model.Record{})
 	})
 }

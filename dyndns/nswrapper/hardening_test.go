@@ -52,7 +52,13 @@ func TestDeleteBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "server localhost\nzone example.test\nupdate delete router.example.test\nupdate delete *.router.example.test\nupdate delete alias.example.test\nupdate delete *.alias.example.test\nsend\n"
+	want := "server localhost\nzone example.test\n"
+	for _, name := range []string{"router", "*.router", "alias", "*.alias"} {
+		for _, kind := range []string{"A", "AAAA", "CNAME"} {
+			want += "update delete " + name + ".example.test " + kind + "\n"
+		}
+	}
+	want += "send\n"
 	if script != want || strings.Count(script, "send\n") != 1 {
 		t.Fatalf("bad batch: %s", script)
 	}

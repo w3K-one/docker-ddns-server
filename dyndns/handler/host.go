@@ -122,13 +122,21 @@ func (h *Handler) ListHosts(c echo.Context) (err error) {
 		migrationReport = strings.Join(changesMade, "\n")
 	}
 
+	hostCertificates := map[uint]bool{}
+	if h.Certificates != nil {
+		for _, host := range hosts {
+			_, err := h.Certificates.ForHost(host.Hostname + "." + host.Domain)
+			hostCertificates[host.ID] = err == nil
+		}
+	}
 	return c.Render(http.StatusOK, "listhosts", echo.Map{
-		"hosts":           &hosts,
-		"title":           h.Title,
-		"logoPath":        h.LogoPath,
-		"migrationReport": migrationReport,
-		"poweredBy":       h.PoweredBy,
-		"poweredByUrl":    h.PoweredByUrl,
+		"hostCertificates": hostCertificates,
+		"hosts":            &hosts,
+		"title":            h.Title,
+		"logoPath":         h.LogoPath,
+		"migrationReport":  migrationReport,
+		"poweredBy":        h.PoweredBy,
+		"poweredByUrl":     h.PoweredByUrl,
 	})
 }
 
@@ -171,6 +179,10 @@ func (h *Handler) EditHost(c echo.Context) (err error) {
 // adds the host entry to the database,
 // and adds the entry to the DNS server.
 func (h *Handler) CreateHost(c echo.Context) (err error) {
+	if h.Records != nil {
+		h.Records.Mu.Lock()
+		defer h.Records.Mu.Unlock()
+	}
 	host := &model.Host{}
 	if err = c.Bind(host); err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
@@ -257,6 +269,10 @@ func (h *Handler) UpdateHost(c echo.Context) (err error) {
 // DeleteHost fetches a host entry from the database by "id"
 // and deletes the database and DNS server entry to it.
 func (h *Handler) DeleteHost(c echo.Context) (err error) {
+	if h.Records != nil {
+		h.Records.Mu.Lock()
+		defer h.Records.Mu.Unlock()
+	}
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, &Error{err.Error()})
@@ -374,6 +390,22 @@ func (h *Handler) UpdateIP(c echo.Context) (err error) {
 }
 
 func (h *Handler) checkUniqueHostname(hostname, domain string) error {
+	if h.Records != nil {
+		if !h.Records.Zone(domain) {
+			return fmt.Errorf("unknown zone")
+		}
+		if _, err := nswrapper.Owner(domain, hostname); err != nil {
+			return err
+		}
+		var count int64
+		if err := h.DB.Model(&model.Record{}).Where("domain = ? AND name IN ?", domain, []string{hostname, "*." + hostname}).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return fmt.Errorf("name has static records; manage those in Records first")
+		}
+	}
+
 	hosts := new([]model.Host)
 	if err := h.DB.Where(&model.Host{Hostname: hostname, Domain: domain}).Find(hosts).Error; err != nil {
 		return err
