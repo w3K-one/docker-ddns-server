@@ -1,8 +1,10 @@
 {{define "content"}}
 <style>
-    .hosts-toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+    .hosts-toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
     .hosts-toolbar h3 { margin:0; }
-    .hosts-toolbar-actions { display:flex; align-items:center; gap:.5rem; }
+    .hosts-toolbar-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .host-domain-filter { width:auto; max-width:100%; }
+    .hosts-table tr[hidden] { display:none; }
     .hosts-table { width:100%; table-layout:fixed; }
     .hosts-table th, .hosts-table td { padding:.65rem .4rem; vertical-align:middle; overflow-wrap:anywhere; }
     .host-sort { color:inherit; font:inherit; font-weight:inherit; border:0; background:none; padding:0; cursor:pointer; text-align:inherit; }
@@ -34,7 +36,7 @@
     }
 </style>
 <div class="marketing">
-    <div class="hosts-toolbar"><h3>DNS Host Entries</h3><div class="hosts-toolbar-actions"><button type="button" class="host-sort-reset btn btn-outline-secondary host-icon" title="Restore original entry order" aria-label="Restore original entry order" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/></svg></button><button class="addHost btn btn-primary btn-sm">Add Host Entry</button></div></div>
+    <div class="hosts-toolbar"><h3>DNS Host Entries</h3><div class="hosts-toolbar-actions"><label class="sr-only" for="host-domain-filter">Filter by domain</label><select id="host-domain-filter" class="custom-select custom-select-sm host-domain-filter"><option value="">All domains</option>{{range .domains}}<option value="{{.}}">{{.}}</option>{{end}}</select><button type="button" class="host-sort-reset btn btn-outline-secondary host-icon" title="Restore original entry order" aria-label="Restore original entry order" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/></svg></button><button class="addHost btn btn-primary btn-sm">Add Host Entry</button></div></div>
     <table class="table table-striped text-center hosts-table">
         <thead>
         <tr>
@@ -48,7 +50,7 @@
         </thead>
         <tbody>
         {{range .hosts}}
-        <tr id="host_{{.ID}}">
+        <tr id="host_{{.ID}}" data-domain="{{.Domain}}">
             <td data-label="Hostname" class="host-name" id="host-hostname_{{.ID}}">{{.Hostname}}.{{.Domain}}</td>
             <td data-label="IP" data-sort-value="{{.Ip}}">{{.Ip}}</td>
             <td data-label="TTL" data-sort-value="{{.Ttl}}">{{.Ttl}}</td>
@@ -83,6 +85,7 @@
         {{end}}
         </tbody>
     </table>
+    <p class="host-filter-empty text-muted" role="status" hidden>No hosts in this domain.</p>
     <script src="/static/js/hosts-sort.js"></script>
 </div>
 

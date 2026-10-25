@@ -9,6 +9,16 @@
         table.querySelectorAll('th[aria-sort]').forEach(th => th.setAttribute('aria-sort', 'none'));
         reset.disabled = true;
     });
+    const domainFilter = document.querySelector('.host-domain-filter');
+    const empty = document.querySelector('.host-filter-empty');
+    domainFilter.addEventListener('change', () => {
+        let visible = 0;
+        Array.from(body.rows).forEach(row => {
+            row.hidden = Boolean(domainFilter.value && row.dataset.domain !== domainFilter.value);
+            if (!row.hidden) visible++;
+        });
+        empty.hidden = visible !== 0;
+    });
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
     // A fixed-width key orders addresses numerically, IPv4 before IPv6.

@@ -131,6 +131,7 @@ func (h *Handler) ListHosts(c echo.Context) (err error) {
 	}
 	return c.Render(http.StatusOK, "listhosts", echo.Map{
 		"hostCertificates": hostCertificates,
+		"domains":          h.Config.Domains,
 		"hosts":            &hosts,
 		"title":            h.Title,
 		"logoPath":         h.LogoPath,
