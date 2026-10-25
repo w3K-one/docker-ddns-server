@@ -20,7 +20,7 @@ With docker-ddns-server you can set up your own dynamic DNS server. This project
 
 ## ✨ Key Features
 
-- **Web-Based Management** - Compact icon navigation with accessible labels and tooltips
+- **Web-Based Management** - Compact icon navigation, left-aligned hostnames, sortable Hostname/IP/TTL/LastUpdate columns with an original-order reset, responsive host rows and certificate actions with accessible labels and tooltips
 - **DNS Records** - A, AAAA, CNAME, TXT, MX, SRV, CAA and delegated NS RRsets
 - **Dual-Stack DDNS** - Independent IPv4 and IPv6 client updates
 - **Let’s Encrypt Certificates** - Automatic zone wildcard issuance and renewal, dedicated host certificates, and ZIP/PEM downloads
@@ -66,7 +66,7 @@ Certificate automation starts disabled until that one-time setup is completed.
 
 For client infrastructure, use **Issue** on the host row or **New certificate**
 with that single hostname. Automatic renewal is selected by default. The host row
-then offers **ZIP**, containing `cert.pem`, `chain.pem`, `fullchain.pem` and
+then offers a **download icon**, containing `cert.pem`, `chain.pem`, `fullchain.pem` and
 `privkey.pem`. **Host ZIP links never fall back to zone wildcards or multi-name
 certificates**, and never select staging certificates. Wildcard ZIPs remain
 available only from the admin Certificates page for the operator's own use.
