@@ -155,6 +155,40 @@ https://ddns.example.com/@/auth/google/callback
 ```
 
 Use the same origin as `DDNS_AUTH_ORIGIN`, with the real hostname substituted.
+Each deployment must use its own Google Cloud project/client credentials and
+administrator allowlist; no w3K account or OAuth credential is built into the image.
+
+To configure your own instance:
+
+1. In Google Cloud Console, select your project and open **Google Auth Platform**.
+   Configure your app's branding and audience. If the app is in testing, add your
+   intended administrators as test users; this does not replace the DDNS allowlist.
+2. Under **Clients**, create an OAuth client of type **Web application**. Add your
+   exact HTTPS callback shown above to **Authorized redirect URIs**. This server-side
+   flow does not require an authorized JavaScript origin.
+3. Store the client ID and secret privately in your deployment environment. Set
+   the variables below, replacing every example with your own values. Keep the
+   existing admin password, persistent session secret and volumes.
+
+   ```yaml
+   environment:
+     DDNS_AUTH_ORIGIN: "https://ddns.example.com"
+     DDNS_GOOGLE_CLIENT_ID: "${DDNS_GOOGLE_CLIENT_ID:?Set your Google web client ID}"
+     DDNS_GOOGLE_CLIENT_SECRET: "${DDNS_GOOGLE_CLIENT_SECRET:?Set your Google client secret}"
+     DDNS_GOOGLE_ALLOWED_EMAILS: "owner@example.com"
+   ```
+
+4. Redeploy, open the canonical login page and choose **Sign in with Google**.
+   Verify the allowed account can sign in before relying on it for recovery.
+   Additional administrators can be explicitly comma-separated in the allowlist;
+   every allowed identity has full administrator access to this single-admin app.
+5. Enroll your own passkey using the steps below. For passkeys without Google,
+   set only `DDNS_AUTH_ORIGIN` and enroll after signing in with the admin password.
+
+Email matching is case-insensitive. An address on another installation's allowlist
+does not grant access to yours. Never publish client secrets in Compose files,
+screenshots or repository history.
+
 Only `openid` and `email` scopes are requested. Google email must be verified and
 explicitly allowed. The first successful sign-in pins its stable Google subject;
 a new Google account taking over the same email is rejected. The allowlist is
